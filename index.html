@@ -568,6 +568,9 @@
           <div id="sector-threshold-list" class="flex flex-wrap gap-x-6 gap-y-1 text-xs font-mono text-slate-400"></div>
         </div>
 
+        <!-- Sector Macro Trend debug — temporary Vercel diagnostics (not wiped by table render) -->
+        <div id="sector-trend-debug" class="mb-4"></div>
+
         <!-- Sector results table — populated by renderSectorTable() -->
         <div id="sector-table-container">
           <div class="flex flex-col items-center justify-center py-20 text-center">
@@ -1416,15 +1419,82 @@
       return data;
     }
 
+    const TREND_DEBUG_EL_ID = 'sector-trend-debug';
+    const TREND_FETCH_TIMEOUT_MS = 15000;
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showTrendDebug(html) {
+      const el = document.getElementById(TREND_DEBUG_EL_ID);
+      if (el) el.innerHTML = html;
+    }
+
     /**
      * Fetches 3-month momentum and SMA200 status for a sector ETF from /api/trend.
-     * Returns the JSON payload or throws on non-OK response.
+     * Returns the JSON payload or throws with a descriptive message on failure.
+     * On failure, writes the error directly into #sector-trend-debug for live Vercel debugging.
      */
     async function fetchSectorTrend(etfTicker) {
-      const res  = await fetch(`/api/trend?ticker=${encodeURIComponent(etfTicker)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Trend data unavailable');
-      return data;
+      const url = `/api/trend?ticker=${encodeURIComponent(etfTicker)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TREND_FETCH_TIMEOUT_MS);
+
+      showTrendDebug(
+        `<div class="px-4 py-3 rounded-lg border border-slate-600 bg-slate-900 font-mono text-sm text-slate-400">` +
+        `Calling ${escapeHtml(url)}…` +
+        `</div>`
+      );
+
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        let data;
+        const rawBody = await res.text();
+        try {
+          data = rawBody ? JSON.parse(rawBody) : {};
+        } catch (parseErr) {
+          throw new Error(
+            `HTTP ${res.status} — non-JSON response: ${rawBody.slice(0, 200) || '(empty)'}`
+          );
+        }
+        if (!res.ok) {
+          throw new Error(data.error ? `HTTP ${res.status}: ${data.error}` : `HTTP ${res.status}: Trend data unavailable`);
+        }
+
+        showTrendDebug(
+          `<div class="px-4 py-3 rounded-lg border border-slate-600 bg-slate-900 font-mono text-sm text-slate-400">` +
+          `Trend API OK (${escapeHtml(etfTicker)}): ${escapeHtml(JSON.stringify(data))}` +
+          `</div>`
+        );
+        return data;
+      } catch (err) {
+        let message = err.message || String(err);
+        if (err.name === 'AbortError') {
+          message = `Request timed out after ${TREND_FETCH_TIMEOUT_MS / 1000}s (possible Vercel function timeout)`;
+        } else if (err instanceof TypeError) {
+          message = `Network error calling ${url}: ${err.message}`;
+        }
+
+        // Explicit live-site error — visible on Vercel without console/logs
+        const debugEl = document.getElementById(TREND_DEBUG_EL_ID);
+        if (debugEl) {
+          debugEl.innerHTML =
+            `<div class="px-4 py-4 rounded-lg border-2 border-slate-500 bg-slate-900 font-mono text-base text-slate-100">` +
+            `<div class="text-xs uppercase tracking-widest text-slate-500 mb-2">Sector Macro Trend — Live Debug</div>` +
+            `<div><span class="text-slate-500">URL:</span> ${escapeHtml(url)}</div>` +
+            `<div class="mt-2 font-semibold">Error: ${escapeHtml(message)}</div>` +
+            `</div>`;
+        }
+
+        throw new Error(message);
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
 
     /**
@@ -1436,6 +1506,7 @@
      * @param {string}      etfTicker - e.g. "XLK"
      */
     function injectTrendBanner(container, trend, etfTicker) {
+      showTrendDebug('');
       const mom       = trend.momentum3m;
       const sign      = mom >= 0 ? '+' : '';
       const flowColor = mom >= 0 ? 'text-emerald-400' : 'text-rose-400';
@@ -1806,6 +1877,7 @@
 
       errorEl.classList.add('hidden');
       errorEl.textContent = '';
+      showTrendDebug('');
 
       scanBtn.disabled  = true;
       scanBtn.innerHTML = `<svg class="animate-spin inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 opacity-70" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Scanning…`;
@@ -1864,10 +1936,17 @@
         const ranked = rankCompanies(_sectorCompanies, _sortState.id, _sortState.dir, activeConfig);
         renderSectorTable(ranked, _sortState, activeConfig);
 
-        // Prepend the Sector Macro Trend banner above the results table (silent on failure)
+        // Prepend the Sector Macro Trend banner above the results table
         if (trendResult.status === 'fulfilled') {
-          injectTrendBanner(container, trendResult.value, etfTicker);
+          try {
+            injectTrendBanner(container, trendResult.value, etfTicker);
+          } catch (bannerErr) {
+            document.getElementById(TREND_DEBUG_EL_ID).innerHTML =
+              'Error: Banner render failed — ' + bannerErr.message +
+              ' | Payload: ' + JSON.stringify(trendResult.value);
+          }
         }
+        // On rejection, fetchSectorTrend catch already wrote to #sector-trend-debug
       } catch (err) {
         _sectorCompanies = null;
         container.innerHTML = `

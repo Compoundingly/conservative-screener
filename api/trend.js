@@ -14,9 +14,11 @@
  *   momentum3m:   number,   // % change over last ~90 calendar days
  * }
  */
-const yahooFinance = require('yahoo-finance2').default;
+import YahooFinance from 'yahoo-finance2';
 
-module.exports = async function handler(req, res) {
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
+
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   // Cache for 1 hour at the CDN edge, serve stale up to 24 h while revalidating
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -39,7 +41,7 @@ module.exports = async function handler(req, res) {
       period1:  startDate,
       period2:  endDate,
       interval: '1d',
-    }, { validateResult: false });
+    });
 
     if (!rows || rows.length < 200) {
       return res.status(422).json({ error: `Insufficient historical data for ${symbol}` });
@@ -85,4 +87,4 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     return res.status(500).json({ error: err.message || 'Failed to fetch trend data' });
   }
-};
+}
