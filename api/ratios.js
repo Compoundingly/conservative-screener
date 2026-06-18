@@ -104,41 +104,30 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── Parallel fetch (3 AV calls) ─────────────────────────────────────────────
-  let overviewRes, balanceRes, incomeRes;
-
-  try {
-    [overviewRes, balanceRes, incomeRes] = await Promise.all([
-      fetch(`${AV_BASE}?function=OVERVIEW&symbol=${symbol}&apikey=${key}`),
-      fetch(`${AV_BASE}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${key}`),
-      fetch(`${AV_BASE}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${key}`),
-    ]);
-  } catch {
-    return res.status(502).json({
-      error: 'Could not reach the data provider. Please try again shortly.',
-    });
-  }
-
-  if (!overviewRes.ok || !balanceRes.ok || !incomeRes.ok) {
-    return res.status(502).json({
-      error: `Data provider returned an error (HTTP ${overviewRes.status} / ${balanceRes.status} / ${incomeRes.status}).`,
-    });
-  }
+  // ── Sequential fetch (3 AV calls, 1 per second) ─────────────────────────────
+  // AV free tier enforces 1 request/second. Parallel calls trip the rate limiter
+  // and return an Information envelope instead of data.
+  const delay = ms => new Promise(r => setTimeout(r, ms));
 
   let overview, balance, income;
 
   try {
-    [overview, balance, income] = await Promise.all([
-      overviewRes.json(),
-      balanceRes.json(),
-      incomeRes.json(),
-    ]);
+    const avFetch = async fn => {
+      const r = await fetch(`${AV_BASE}?function=${fn}&symbol=${symbol}&apikey=${key}`);
+      if (!r.ok) throw new Error(`Data provider returned HTTP ${r.status} for ${fn}.`);
+      const d = await r.json();
+      assertNotRateLimited(d, fn);
+      return d;
+    };
 
-    assertNotRateLimited(overview, 'OVERVIEW');
-    assertNotRateLimited(balance,  'BALANCE_SHEET');
-    assertNotRateLimited(income,   'INCOME_STATEMENT');
+    overview = await avFetch('OVERVIEW');
+    await delay(1100);
+    balance  = await avFetch('BALANCE_SHEET');
+    await delay(1100);
+    income   = await avFetch('INCOME_STATEMENT');
   } catch (err) {
-    return res.status(429).json({ error: err.message });
+    const status = err.message.includes('rate limit') ? 429 : 502;
+    return res.status(status).json({ error: err.message });
   }
 
   // ── Validate response ───────────────────────────────────────────────────────
