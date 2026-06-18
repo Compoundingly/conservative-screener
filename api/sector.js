@@ -27,7 +27,16 @@ import YahooFinance from 'yahoo-finance2';
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
+// summaryDetail is included solely for trailingPE, which is absent from defaultKeyStatistics.
+// P/E fallback chain: summaryDetail.trailingPE (positive) →
+//                     defaultKeyStatistics.forwardPE (positive) → null
 const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
+
+function extractPE(ks, sd) {
+  const trailing = (sd?.trailingPE != null && sd.trailingPE > 0) ? sd.trailingPE : null;
+  const forward  = (ks?.forwardPE  != null && ks.forwardPE  > 0) ? ks.forwardPE  : null;
+  return trailing ?? forward ?? null;
+}
 
 // ── Sector ticker registry ───────────────────────────────────────────────────
 
@@ -181,7 +190,7 @@ async function fetchOneTicker(symbol) {
     current_ratio:     fd.currentRatio  ?? null,
     debt_to_equity:    fd.debtToEquity  ?? null,
     price_to_book:     ks.priceToBook   ?? null,
-    price_to_earnings: sd.trailingPE    ?? ks.forwardPE ?? null,
+    price_to_earnings: extractPE(ks, sd),
   };
 }
 

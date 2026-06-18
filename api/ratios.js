@@ -5,9 +5,12 @@
  *
  * Modules used → fields extracted
  * ─────────────────────────────────────────────────────────────────────────────
- * financialData      → currentRatio, debtToEquity (as %, e.g. 79.5 = 79.5% D/E)
- * defaultKeyStatistics → priceToBook, forwardPE (fallback for P/E)
- * summaryDetail      → trailingPE (preferred P/E)
+ * financialData        → currentRatio, debtToEquity (% format, e.g. 79.5 = 0.795x)
+ * defaultKeyStatistics → priceToBook, forwardPE (P/E fallback)
+ * summaryDetail        → trailingPE (preferred P/E; not available in defaultKeyStatistics)
+ *
+ * P/E fallback chain: summaryDetail.trailingPE (positive) →
+ *                     defaultKeyStatistics.forwardPE (positive) → null
  *
  * GET /api/ratios?ticker=AAPL
  */
@@ -18,10 +21,24 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Robust P/E extraction.
+ * Prefers trailing P/E; negative P/E (loss-making companies) is treated as
+ * unusable data and falls back to forward P/E. Returns null if both are absent.
+ */
+function extractPE(ks, sd) {
+  const trailing = (sd?.trailingPE  != null && sd.trailingPE  > 0) ? sd.trailingPE  : null;
+  const forward  = (ks?.forwardPE   != null && ks.forwardPE   > 0) ? ks.forwardPE   : null;
+  return trailing ?? forward ?? null;
+}
+
+// ── Handler ──────────────────────────────────────────────────────────────────
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
-  // ── Input validation ────────────────────────────────────────────────────────
   const { ticker } = req.query;
 
   if (!ticker || !/^[A-Za-z]{1,6}$/.test(ticker)) {
@@ -32,15 +49,13 @@ export default async function handler(req, res) {
 
   const symbol = ticker.toUpperCase();
 
-  // ── Fetch from Yahoo Finance ─────────────────────────────────────────────────
   let result;
 
   try {
     result = await yahooFinance.quoteSummary(symbol, { modules: MODULES });
   } catch (err) {
-    // FailedYahooValidation still carries a partial result — use it
     if (err.result) {
-      result = err.result;
+      result = err.result; // FailedYahooValidation — partial result is still usable
     } else {
       const msg = err.message ?? '';
       const status = msg.toLowerCase().includes('no fundamentals') ? 404 : 502;
@@ -57,13 +72,13 @@ export default async function handler(req, res) {
   const sd = result.summaryDetail        ?? {};
 
   return res.status(200).json({
-    ticker,
+    ticker:           symbol,
     fiscalDateEnding: null,
     observedValues: {
       current_ratio:     fd.currentRatio  ?? null,
-      debt_to_equity:    fd.debtToEquity  ?? null,   // Yahoo Finance % format (79.5 = 0.795x D/E)
+      debt_to_equity:    fd.debtToEquity  ?? null,
       price_to_book:     ks.priceToBook   ?? null,
-      price_to_earnings: sd.trailingPE    ?? ks.forwardPE ?? null,
+      price_to_earnings: extractPE(ks, sd),
     },
   });
 }

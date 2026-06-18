@@ -447,6 +447,24 @@
               </select>
             </div>
 
+            <!-- Margin of Safety -->
+            <div class="flex flex-col gap-1.5">
+              <label for="mos-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Margin of Safety</label>
+              <select
+                id="mos-select"
+                onchange="onMoSChange()"
+                class="bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                       text-sm text-slate-200 font-medium
+                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                       transition-colors cursor-pointer"
+              >
+                <option value="0">None</option>
+                <option value="0.10">10%</option>
+                <option value="0.15">15%</option>
+                <option value="0.20">20%</option>
+              </select>
+            </div>
+
             <!-- Scan button -->
             <button
               id="scan-btn"
@@ -535,12 +553,33 @@
     };
 
     /**
-     * Merges FIELD_REGISTRY with the appropriate SECTOR_CONFIG thresholds.
-     * Returns a complete criterion array ready for the Calculation Layer.
+     * Tightens each threshold by the Margin of Safety fraction.
+     * Operators with upper bounds (<=) are reduced; lower bounds (>=) are raised.
+     * A 10% MoS on P/E ≤ 15 → P/E ≤ 13.50.
      */
-    function getActiveConfig(sector) {
+    function applyMoS(config, mos) {
+      if (!mos) return config;
+      return config.map(c => ({
+        ...c,
+        threshold: c.operator === '<=' ? +(c.threshold * (1 - mos)).toFixed(4)
+                 : c.operator === '>=' ? +(c.threshold * (1 + mos)).toFixed(4)
+                 : c.threshold,
+      }));
+    }
+
+    /**
+     * Merges FIELD_REGISTRY with sector thresholds, then applies the
+     * Margin of Safety tightening if mosFraction > 0.
+     */
+    function getActiveConfig(sector, mosFraction) {
       const thresholds = SECTOR_CONFIG[sector] ?? SECTOR_CONFIG.default;
-      return FIELD_REGISTRY.map(f => ({ ...f, threshold: thresholds[f.id] }));
+      const base = FIELD_REGISTRY.map(f => ({ ...f, threshold: thresholds[f.id] }));
+      return applyMoS(base, mosFraction ?? 0);
+    }
+
+    /** Reads the current Margin of Safety value from the UI select. */
+    function getMoS() {
+      return parseFloat(document.getElementById('mos-select')?.value ?? '0') || 0;
     }
 
     // ── DATA LAYER ──────────────────────────────────────────────────────────────
@@ -639,10 +678,14 @@
           const divider   = idx < items.length - 1
             ? `<div class="w-full h-px bg-slate-700/50"></div>`
             : '';
+          // Compliant colors per .cursorrules (no green/red):
+          const valCls = item.passed === true  ? 'text-sky-300'
+                       : item.passed === false ? 'text-slate-500'
+                       : 'text-slate-700';
           return `
             <div class="flex justify-between items-center text-sm">
               <span class="text-slate-400">${item.label}</span>
-              <span class="font-mono text-slate-300">${observed} <span class="text-slate-600">${threshold}</span></span>
+              <span class="font-mono ${valCls}">${observed} <span class="text-slate-600">${threshold}</span></span>
             </div>${divider}`;
         }).join('');
 
@@ -851,11 +894,17 @@
         const total       = calcResults.length;
 
         const cells = FIELD_REGISTRY.map(f => {
-          const rawVal  = company.observedValues[f.id] ?? null;
-          const isNull  = rawVal === null;
-          const valStr  = formatValue(rawVal, f.unit);
-          const isActive = f.id === sortState.id;
-          const textCls = isNull ? 'text-slate-700' : (isActive ? 'text-slate-200' : 'text-slate-400');
+          const rawVal    = company.observedValues[f.id] ?? null;
+          const isNull    = rawVal === null;
+          const valStr    = formatValue(rawVal, f.unit);
+          const isActive  = f.id === sortState.id;
+          const criterion = calcResults.find(r => r.id === f.id);
+          // Compliant color scheme per .cursorrules (no green/red):
+          // sky-300 = criteria satisfied  |  slate-500 = criteria unmet  |  slate-700 = no data
+          const textCls = isNull                       ? 'text-slate-700'
+                        : criterion?.passed === true   ? (isActive ? 'text-sky-200'   : 'text-sky-300')
+                        : criterion?.passed === false  ? (isActive ? 'text-slate-300' : 'text-slate-500')
+                        : 'text-slate-400';
           return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
@@ -915,8 +964,27 @@
         document.getElementById('sort-select').value = colId;
       }
 
-      const activeConfig = getActiveConfig(_sectorName ?? 'default');
+      const activeConfig = getActiveConfig(_sectorName ?? 'default', getMoS());
       const ranked       = rankCompanies(_sectorCompanies, _sortState.id, _sortState.dir, activeConfig);
+      renderSectorTable(ranked, _sortState, activeConfig);
+    }
+
+    /**
+     * Called instantly when the Margin of Safety selector changes.
+     * Re-evaluates and re-renders the existing results without re-fetching.
+     */
+    function onMoSChange() {
+      if (!_sectorCompanies || !_sectorName) return;
+      const mos          = getMoS();
+      const activeConfig = getActiveConfig(_sectorName, mos);
+      // Refresh the threshold reference panel with tightened values
+      const mosLabel = mos > 0 ? ` — <span class="text-slate-500">${(mos * 100).toFixed(0)}% MoS applied</span>` : '';
+      document.getElementById('sector-threshold-name').innerHTML =
+        (_sectorName === 'default' ? 'General' : _sectorName) + mosLabel;
+      document.getElementById('sector-threshold-list').innerHTML = activeConfig.map(f =>
+        `<span>${f.label}: <span class="text-slate-500">${f.operator} ${+f.threshold.toFixed(2)}${f.unit}</span></span>`
+      ).join('');
+      const ranked = rankCompanies(_sectorCompanies, _sortState.id, _sortState.dir, activeConfig);
       renderSectorTable(ranked, _sortState, activeConfig);
     }
 
@@ -942,11 +1010,13 @@
       document.getElementById('heading-context').classList.remove('hidden');
       document.getElementById('heading-date').classList.add('hidden');
 
-      // Show threshold reference panel
-      const activeConfig = getActiveConfig(sector);
-      document.getElementById('sector-threshold-name').textContent = sectorLabel;
+      // Show threshold reference panel (with MoS applied)
+      const mos          = getMoS();
+      const activeConfig = getActiveConfig(sector, mos);
+      const mosLabel     = mos > 0 ? ` — <span class="text-slate-500">${(mos * 100).toFixed(0)}% MoS applied</span>` : '';
+      document.getElementById('sector-threshold-name').innerHTML = sectorLabel + mosLabel;
       document.getElementById('sector-threshold-list').innerHTML = activeConfig.map(f =>
-        `<span>${f.label}: <span class="text-slate-500">${f.operator} ${f.threshold}${f.unit}</span></span>`
+        `<span>${f.label}: <span class="text-slate-500">${f.operator} ${+f.threshold.toFixed(2)}${f.unit}</span></span>`
       ).join('');
       document.getElementById('sector-thresholds').classList.remove('hidden');
 
