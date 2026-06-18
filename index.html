@@ -89,6 +89,33 @@
     #cs-tooltip .tp-defb { color: #cbd5e1; font-size: 11px; } /* definition body  */
     #cs-tooltip .tp-bm   { color: #475569; }   /* benchmark label   */
     #cs-tooltip .tp-bmb  { color: #475569; font-size: 10.5px; } /* benchmark body */
+    /* ── TickerInsights terminal panel ───────────────────────────────────────*/
+    @keyframes cs-blink {
+      0%, 49%  { opacity: 0.8; }
+      50%, 100%{ opacity: 0;   }
+    }
+    .cs-cursor {
+      display: inline-block;
+      width: 6px; height: 0.85em;
+      background: currentColor;
+      vertical-align: text-bottom;
+      margin-left: 2px;
+      animation: cs-blink 1.1s step-start infinite;
+    }
+    /* Rotating chevron on the toggle button */
+    #insights-arrow { transition: transform .2s ease; }
+    #insights-toggle-btn[aria-expanded="true"] #insights-arrow {
+      transform: rotate(90deg);
+    }
+    /* Highlighted data value inside the prose paragraphs */
+    .insights-val {
+      font-family: 'JetBrains Mono', monospace;
+      color: #cbd5e1;   /* slate-300 */
+      font-size: 0.92em;
+    }
+    .insights-val.pass { color: #7dd3fc; }  /* sky-300 — criteria met   */
+    .insights-val.fail { color: #94a3b8; }  /* slate-400 — criteria unmet */
+
     /* Tooltip info-dot trigger */
     [data-tooltip-key] { cursor: help; }
     [data-tooltip-key] .tip-dot {
@@ -447,6 +474,27 @@
           <div class="mt-4 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
             <div id="summary-bar" class="h-full bg-slate-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
           </div>
+        </div>
+
+        <!-- TickerInsights — toggle + terminal panel (shown after renderDashboard) -->
+        <div id="insights-toggle-row" class="hidden mt-5">
+          <button
+            id="insights-toggle-btn"
+            aria-expanded="false"
+            aria-controls="insights-panel"
+            onclick="toggleInsights()"
+            class="flex items-center gap-2 text-xs font-mono text-slate-600
+                   hover:text-slate-400 transition-colors duration-150 cursor-pointer
+                   focus:outline-none select-none"
+          >
+            <span id="insights-arrow">▸</span>
+            <span>EXPLAIN METRICS</span>
+            <span class="opacity-35">/ TICKER ANALYSIS</span>
+          </button>
+        </div>
+
+        <div id="insights-panel" class="hidden mt-3" aria-live="polite">
+          <!-- populated by renderInsightsPanel() -->
         </div>
 
       </div><!-- /panel-ticker -->
@@ -1032,6 +1080,9 @@
       document.getElementById('summary-pct').textContent  = `${pct}% criteria met`;
       document.getElementById('summary-bar').style.width  = `${pct}%`;
       document.getElementById('completion-summary').classList.remove('hidden');
+
+      // ── TickerInsights panel ──────────────────────────────────────────────────
+      TickerInsights(ticker, observedValues, results);
     }
 
     /**
@@ -1053,6 +1104,204 @@
           </div>
           <span class="font-mono whitespace-nowrap ${valCls} flex-shrink-0">${icon} ${detail}</span>
         </div>`;
+    }
+
+    // ── TICKER INSIGHTS MODULE ───────────────────────────────────────────────────
+    /**
+     * TickerInsights — generates a neutral, terminal-grade prose report
+     * for a single ticker from its observed values and calculation results.
+     *
+     * Implemented as a plain-JS module (not React) consistent with this
+     * codebase, but follows the same props-driven, side-effect-free pattern.
+     * The user-facing name "TickerInsights" is honoured in the public API.
+     */
+
+    /**
+     * Wraps a numeric string in a styled <span> for inline highlighting.
+     * status: 'pass' | 'fail' | 'neutral'
+     */
+    function _val(text, status) {
+      const cls = status === 'pass'    ? 'pass'
+                : status === 'fail'    ? 'fail'
+                : '';
+      return `<span class="insights-val ${cls}">${text}</span>`;
+    }
+
+    /**
+     * Pure function: converts observedValues + calcResults into an object
+     * { p1: string, p2: string } — two prose paragraphs for the report.
+     *
+     * Uses sector-default thresholds from calcResults so MoS is automatically
+     * reflected if the single-ticker view ever applies it in the future.
+     *
+     * No DOM access, no advice language — arithmetic statements only.
+     */
+    function generateInsightsText(ov, calcResults) {
+      function res(id) { return calcResults.find(r => r.id === id) ?? null; }
+
+      const sentences1 = [];   // Para 1: liquidity, debt, vitality
+      const sentences2 = [];   // Para 2: valuation, capital efficiency
+
+      // ── 1. Liquidity (Current Ratio) ─────────────────────────────────────────
+      const crRes = res('current_ratio');
+      const cr    = ov.current_ratio ?? null;
+      if (cr !== null && crRes) {
+        const thr = crRes.threshold;
+        if (cr >= thr) {
+          sentences1.push(
+            `The Current Ratio of ${_val(cr.toFixed(2) + 'x', 'pass')} satisfies the ${thr}x requirement, indicating strong short-term liquidity.`
+          );
+        } else {
+          sentences1.push(
+            `Short-term liquidity is mathematically insufficient, with a Current Ratio of ${_val(cr.toFixed(2) + 'x', 'fail')} falling below the ${thr}x requirement.`
+          );
+        }
+      }
+
+      // ── 2. Debt Load (Debt/Equity) ───────────────────────────────────────────
+      const deRes = res('debt_to_equity');
+      const de    = ov.debt_to_equity ?? null;
+      if (de !== null && deRes) {
+        const thr = deRes.threshold;
+        if (de <= thr) {
+          sentences1.push(
+            `The Debt-to-Equity ratio of ${_val(de.toFixed(1) + '%', 'pass')} is well within the ${thr}% limit, showing a resilient capital structure.`
+          );
+        } else {
+          sentences1.push(
+            `The capital structure shows a Debt-to-Equity ratio of ${_val(de.toFixed(1) + '%', 'fail')}, exceeding the conservative maximum limit of ${thr}% and indicating structural reliance on debt.`
+          );
+        }
+      }
+
+      // ── 3. Vitality (Revenue Growth + ROE) ───────────────────────────────────
+      const rg  = ov.revenue_growth   ?? null;
+      const roe = ov.return_on_equity ?? null;
+      const rgPct  = rg  !== null ? (rg  * 100).toFixed(1) : null;
+      const roePct = roe !== null ? (roe * 100).toFixed(1) : null;
+      const rgPass  = rg  !== null ? rg  >= VITALITY_THRESHOLDS.revenue_growth  : null;
+      const roePass = roe !== null ? roe >= VITALITY_THRESHOLDS.return_on_equity : null;
+
+      if (rgPass !== null || roePass !== null) {
+        if (rgPass !== false && roePass !== false) {
+          // Both present and both passing (or one null)
+          const parts = [
+            rgPct  !== null ? `Revenue Growth at ${_val(rgPct + '%', 'pass')}`  : null,
+            roePct !== null ? `Return on Equity at ${_val(roePct + '%', 'pass')}` : null,
+          ].filter(Boolean).join(' and ');
+          sentences1.push(`Vitality metrics satisfy baseline operational thresholds — ${parts}.`);
+        } else {
+          const failing = [
+            rgPass  === false ? `Revenue Growth at ${_val(rgPct + '%', 'fail')}`  : null,
+            roePass === false ? `Return on Equity at ${_val(roePct + '%', 'fail')}` : null,
+          ].filter(Boolean).join(' and ');
+          sentences1.push(
+            `The enterprise's vitality metrics fall below baseline operational thresholds. Currently, ${failing} is below the required minimum.`
+          );
+        }
+      }
+
+      // ── 4. Valuation (F/K and P/B) ───────────────────────────────────────────
+      // "F/K" is the user-designated neutral label for Price-to-Earnings.
+      const peRes = res('price_to_earnings');
+      const pbRes = res('price_to_book');
+      const pe    = ov.price_to_earnings ?? null;
+      const pb    = ov.price_to_book     ?? null;
+      const pePass = peRes && pe !== null ? pe <= peRes.threshold : null;
+      const pbPass = pbRes && pb !== null ? pb <= pbRes.threshold : null;
+
+      if (pe !== null || pb !== null) {
+        const fkStr = pe !== null ? `F/K is ${_val(pe.toFixed(1) + 'x', pePass ? 'pass' : 'fail')}` : null;
+        const pbStr = pb !== null ? `P/B is ${_val(pb.toFixed(2) + 'x', pbPass ? 'pass' : 'fail')}` : null;
+        const vals  = [fkStr, pbStr].filter(Boolean).join(' and ');
+
+        if (pePass === false || pbPass === false) {
+          sentences2.push(`Market pricing exceeds predefined defensive ceilings. ${vals}.`);
+        } else {
+          sentences2.push(`Valuation multiples are within defensive margins (${vals}).`);
+        }
+      }
+
+      // ── 5. Capital Efficiency (ROIC vs WACC) ─────────────────────────────────
+      const roic = ov.roic ?? null;
+      const wacc = ov.wacc ?? null;
+      if (roic !== null && wacc !== null) {
+        const roicPct   = (roic * 100).toFixed(1);
+        const waccPct   = (wacc * 100).toFixed(1);
+        const spread    = (roic - wacc) * 100;
+        const spreadStr = (spread >= 0 ? '+' : '') + spread.toFixed(1);
+        const aboveWacc = spread >= 0;
+        sentences2.push(
+          `The firm generates a cash return on invested capital of ${_val(roicPct + '%', aboveWacc ? 'pass' : 'fail')} against a cost of capital of ${_val(waccPct + '%', 'neutral')}, resulting in a spread of ${_val(spreadStr + ' pp', aboveWacc ? 'pass' : 'fail')}.`
+        );
+      }
+
+      return {
+        p1: sentences1.join(' '),
+        p2: sentences2.join(' '),
+      };
+    }
+
+    /**
+     * TickerInsights — renders the terminal analysis panel into #insights-panel.
+     * Called by renderDashboard after every successful fetch.
+     */
+    function TickerInsights(ticker, observedValues, calcResults) {
+      const panel      = document.getElementById('insights-panel');
+      const toggleRow  = document.getElementById('insights-toggle-row');
+      if (!panel || !toggleRow) return;
+
+      const { p1, p2 } = generateInsightsText(observedValues, calcResults);
+      if (!p1 && !p2) return;   // no sentences generated — nothing to show
+
+      // ISO timestamp without milliseconds
+      const ts = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+
+      panel.innerHTML = `
+        <div class="bg-brand-900 border border-slate-700/40 rounded-xl p-6
+                    shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+
+          <!-- Terminal header row -->
+          <div class="flex flex-wrap items-center justify-between gap-2
+                      text-xs font-mono text-slate-600
+                      border-b border-slate-800/80 pb-3 mb-5">
+            <span>
+              <span class="text-slate-400 font-semibold tracking-widest">${ticker}</span>
+              <span class="mx-2 opacity-30">|</span>METRIC ANALYSIS
+            </span>
+            <span class="opacity-60">GENERATED:&thinsp;${ts}</span>
+          </div>
+
+          <!-- Prose paragraphs -->
+          <div class="space-y-4 text-sm text-slate-400 leading-[1.85]">
+            ${p1 ? `<p>${p1}</p>` : ''}
+            ${p2 ? `<p>${p2}</p>` : ''}
+          </div>
+
+          <!-- Terminal footer -->
+          <div class="mt-5 pt-3 border-t border-slate-800/60
+                      text-[11px] font-mono text-slate-700 flex items-center gap-1">
+            <span>Outputs are arithmetic comparisons only. Not financial advice.</span>
+            <span class="cs-cursor"></span>
+          </div>
+        </div>`;
+
+      toggleRow.classList.remove('hidden');
+
+      // Reset toggle state so it starts collapsed on each new ticker
+      const btn = document.getElementById('insights-toggle-btn');
+      panel.classList.add('hidden');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    /** Called by the toggle button in panel-ticker. */
+    function toggleInsights() {
+      const btn   = document.getElementById('insights-toggle-btn');
+      const panel = document.getElementById('insights-panel');
+      const open  = btn.getAttribute('aria-expanded') === 'true';
+
+      btn.setAttribute('aria-expanded', String(!open));
+      panel.classList.toggle('hidden', open);
     }
 
     // ── ORCHESTRATOR ─────────────────────────────────────────────────────────────
@@ -1085,6 +1334,9 @@
       document.getElementById('completion-summary').classList.add('hidden');
       document.getElementById('heading-context').classList.add('hidden');
       document.getElementById('heading-date').classList.add('hidden');
+      // Hide the insights toggle and panel when starting a fresh fetch
+      document.getElementById('insights-toggle-row').classList.add('hidden');
+      document.getElementById('insights-panel').classList.add('hidden');
 
       container.innerHTML = `
         <div class="col-span-full flex items-center justify-center py-20 text-slate-500 text-sm">
