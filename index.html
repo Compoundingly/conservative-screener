@@ -58,6 +58,49 @@
       accent-color: #475569;
     }
 
+    /* ── Global floating tooltip ──────────────────────────────────────────────
+     * Uses position:fixed so it breaks out of overflow:hidden/auto containers.
+     * Shown/hidden entirely by JavaScript; no CSS :hover needed.
+     */
+    #cs-tooltip {
+      position: fixed;
+      z-index: 9999;
+      display: none;
+      width: 272px;
+      pointer-events: none;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 0.5rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    #cs-tooltip .tp-section { padding: 10px 12px; }
+    #cs-tooltip .tp-divider { border-top: 1px solid #1e293b; margin: 0 12px; }
+    #cs-tooltip .tp-label   {
+      font-size: 9.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: 5px;
+    }
+    #cs-tooltip .tp-def  { color: #94a3b8; }   /* definition label  */
+    #cs-tooltip .tp-defb { color: #cbd5e1; font-size: 11px; } /* definition body  */
+    #cs-tooltip .tp-bm   { color: #475569; }   /* benchmark label   */
+    #cs-tooltip .tp-bmb  { color: #475569; font-size: 10.5px; } /* benchmark body */
+    /* Tooltip info-dot trigger */
+    [data-tooltip-key] { cursor: help; }
+    [data-tooltip-key] .tip-dot {
+      display: inline-block;
+      margin-left: 3px;
+      font-size: 9px;
+      opacity: 0.35;
+      vertical-align: middle;
+      transition: opacity .15s;
+    }
+    [data-tooltip-key]:hover .tip-dot { opacity: 0.7; }
+
     /* CTA button lock animation */
     @keyframes unlock-pulse {
       0%   { box-shadow: 0 0 0 0 rgba(100,116,139,0.4); }
@@ -80,6 +123,9 @@
 </head>
 
 <body class="h-full bg-brand-900 text-slate-300 font-sans antialiased">
+
+  <!-- ── Global tooltip panel (position:fixed, breaks out of overflow containers) ── -->
+  <div id="cs-tooltip" role="tooltip" aria-hidden="true"></div>
 
   <!-- =====================================================================
        LEGAL DISCLAIMER MODAL
@@ -525,6 +571,126 @@
       { id: 'price_to_earnings', label: 'Price-to-Earnings', filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x',  rankDir: 'asc'  },
     ];
 
+    // ── TOOLTIP DEFINITIONS ───────────────────────────────────────────────────
+    /**
+     * Academic definition + benchmark guideline for each metric.
+     * Rendered by the global floating tooltip; keyed by field id or a named key.
+     */
+    const TOOLTIP_DEFINITIONS = {
+      current_ratio: {
+        definition: 'Current assets ÷ current liabilities. Measures short-term liquidity — the firm\'s ability to meet obligations due within one year from assets expected to convert to cash in the same period.',
+        benchmark:  'Benjamin Graham required ≥ 2.0× for industrial companies, treating any ratio below 1.5× as a working-capital stress signal. Sector thresholds in this screener are adjusted for capital-intensive industries.',
+      },
+      debt_to_equity: {
+        definition: 'Total financial debt ÷ total stockholders\' equity. Displayed in Yahoo Finance\'s percentage format: 100 = 1.0× ratio. Quantifies financial leverage and the reliance on creditor versus owner financing.',
+        benchmark:  'Graham\'s rule: long-term debt ≤ 50 % of net tangible assets (≤ 100 in this format for most sectors). Capital-intensive sectors — REITs, Utilities, Financials — structurally carry higher leverage by design and have sector-adjusted ceilings.',
+      },
+      price_to_book: {
+        definition: 'Market price per share ÷ book value per share (net assets per share). Compares market capitalisation to the accounting value of net assets. A ratio below 1.0× implies the market prices the business below its theoretical liquidation value.',
+        benchmark:  'Graham\'s "defensive investor" ceiling: ≤ 1.5× (or combined P/E × P/B ≤ 22.5). Intangible-intensive sectors (Technology, Healthcare, Consumer Brands) legitimately trade above book because valuable assets — patents, software, brand equity — are expensed rather than capitalised.',
+      },
+      price_to_earnings: {
+        definition: 'Current share price ÷ trailing-twelve-month earnings per share. Represents the price paid per dollar of current earnings. Its inverse (E/P) is the "earnings yield." Negative P/E (loss-making companies) is treated as N/A and sinks to the bottom when sorting.',
+        benchmark:  'Graham\'s ceiling for defensive investors: ≤ 15× trailing earnings (or combined P/E × P/B ≤ 22.5). Growth-premium sectors warrant higher multiples reflecting durable reinvestment opportunities above the cost of capital. Forward P/E is used as a fallback when trailing is unavailable.',
+      },
+      roic: {
+        definition: 'Cash ROIC = EBITDA × (1 − 0.21) ÷ Invested Capital, where Invested Capital = Equity + Debt − Cash. WACC (Weighted Average Cost of Capital) is estimated via CAPM: Ke = rf + β × MRP, blended with after-tax cost of debt. Spread = ROIC − WACC.',
+        benchmark:  'Mauboussin (Capital Allocation Framework): a firm creates intrinsic value only when ROIC > WACC. A sustained +10 to +15 pp spread is characteristic of high-quality compounders. This screener uses EBITDA-based cash ROIC; WACC assumes rf = 4.5 %, MRP = 5.5 %, Kd = 5.0 %. Single-period TTM approximation — not a rolling 3-year ROIIC.',
+      },
+      // Structural Risk sub-checks
+      vitality: {
+        definition: 'Composite check on top-line momentum and capital efficiency: Revenue Growth ≥ 2 % TTM (outpacing baseline stagnation) AND Return on Equity ≥ 10 % TTM (adequate capital efficiency).',
+        benchmark:  'Designed to flag potential value traps — businesses with eroding competitive positioning despite adequate balance sheets. Both conditions must hold; failure of either triggers the check.',
+      },
+      dividend_trap: {
+        definition: 'Payout Ratio = dividends paid ÷ net income. A high payout ratio signals that a disproportionate share of earnings is being returned rather than reinvested, leaving little buffer for debt service or capex during downturns.',
+        benchmark:  'Graham / Mauboussin: payout > 80 % of earnings is generally unsustainable — a potential dividend trap. Companies paying no dividend (payout ratio null or zero) are excluded from this check.',
+      },
+      debt_load: {
+        definition: 'Evaluates whether total financial leverage — measured via Debt/Equity in Yahoo Finance\'s percentage format — is within structurally sound bounds. Negative equity (de < 0) indicates a technically insolvent balance sheet.',
+        benchmark:  'Trigger threshold: D/E > 100 (i.e. debt exceeds equity) or negative equity. Referencing Graham\'s 50 % capitalisation rule. Sector-specific D/E ceilings in SECTOR_CONFIG override the Structural Risk baseline.',
+      },
+      coverage: {
+        definition: 'EBITDA Coverage Proxy = EBITDA ÷ (Total Debt × 5 %). Approximates how many times operating cash earnings cover the annual interest burden at an assumed 5 % borrowing rate. Direct interest expense is unavailable from Yahoo Finance since Nov 2024.',
+        benchmark:  'Investment-grade credit floor: ≥ 3.0× EBITDA coverage. EBITDA is used (not GAAP operating income) so depreciation on real assets does not distort capital-intensive sector results. A null value (no debt or missing data) is treated as a pass by default.',
+      },
+    };
+
+    /**
+     * Builds the inner HTML of the floating tooltip panel for a given key.
+     */
+    function buildTooltipHTML(key) {
+      const def = TOOLTIP_DEFINITIONS[key];
+      if (!def) return '';
+      return `
+        <div class="tp-section">
+          <p class="tp-label tp-def">Definition</p>
+          <p class="tp-defb">${def.definition}</p>
+        </div>
+        <div class="tp-divider"></div>
+        <div class="tp-section">
+          <p class="tp-label tp-bm">Benchmark Guideline</p>
+          <p class="tp-bmb">${def.benchmark}</p>
+        </div>`;
+    }
+
+    // ── Global floating tooltip engine ────────────────────────────────────────
+    // Uses position:fixed so the panel is never clipped by overflow:auto containers.
+    // Event delegation handles dynamically re-rendered table headers and card labels.
+    (function initTooltipEngine() {
+      const panel = document.getElementById('cs-tooltip');
+      let hideTimer = null;
+      let currentTarget = null;
+
+      function positionAndShow(el) {
+        const key  = el.getAttribute('data-tooltip-key');
+        const html = buildTooltipHTML(key);
+        if (!html) return;
+
+        panel.innerHTML = html;
+        panel.style.display = 'block';
+
+        const rect = el.getBoundingClientRect();
+        const pw   = panel.offsetWidth;
+        const ph   = panel.offsetHeight;
+
+        // Prefer above the element; flip below if too close to viewport top
+        let top  = rect.top - ph - 10;
+        let left = rect.left + rect.width / 2 - pw / 2;
+
+        if (top < 8)  top  = rect.bottom + 10;
+        // Clamp horizontally within viewport
+        left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+
+        panel.style.top  = top  + 'px';
+        panel.style.left = left + 'px';
+      }
+
+      document.addEventListener('mouseover', function(e) {
+        const el = e.target.closest('[data-tooltip-key]');
+        if (!el) return;
+        clearTimeout(hideTimer);
+        currentTarget = el;
+        positionAndShow(el);
+      });
+
+      document.addEventListener('mouseout', function(e) {
+        const el = e.target.closest('[data-tooltip-key]');
+        if (!el) return;
+        hideTimer = setTimeout(function() {
+          panel.style.display = 'none';
+          currentTarget = null;
+        }, 120);
+      });
+
+      // Re-position on scroll (table can scroll horizontally)
+      window.addEventListener('scroll', function() {
+        if (currentTarget && panel.style.display !== 'none') {
+          positionAndShow(currentTarget);
+        }
+      }, { passive: true });
+    })();
+
     /**
      * SECTOR_CONFIG — Per-sector threshold overrides.
      * Each key maps to an object of { fieldId: thresholdNumber }.
@@ -682,9 +848,10 @@
           const valCls = item.passed === true  ? 'text-sky-300'
                        : item.passed === false ? 'text-slate-500'
                        : 'text-slate-700';
+          const hasTip = item.id in TOOLTIP_DEFINITIONS;
           return `
             <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">${item.label}</span>
+              <span class="text-slate-400${hasTip ? ' cursor-help' : ''}"${hasTip ? ` data-tooltip-key="${item.id}"` : ''}>${item.label}${hasTip ? '<span class="tip-dot">ⓘ</span>' : ''}</span>
               <span class="font-mono ${valCls}">${observed} <span class="text-slate-600">${threshold}</span></span>
             </div>${divider}`;
         }).join('');
@@ -717,7 +884,8 @@
         : 'unknown',
           vitStatus === 'met'     ? 'Met'
         : vitStatus === 'unmet'   ? 'Below threshold'
-        : '— No data'
+        : '— No data',
+          'vitality'
         );
 
         // 2. Dividend Trap
@@ -733,7 +901,8 @@
         : !hasDividend            ? 'No dividend'
         : pr > STRUCTURAL_THRESHOLDS.payoutRatio
             ? `${(pr * 100).toFixed(0)}% payout`
-            : `${(pr * 100).toFixed(0)}% payout`
+            : `${(pr * 100).toFixed(0)}% payout`,
+          'dividend_trap'
         );
 
         // 3. Debt Load
@@ -746,7 +915,8 @@
           de === null ? '— No data'
         : debtTriggered
             ? `${de.toFixed(1)} (>${STRUCTURAL_THRESHOLDS.debtToEquity})`
-            : `${de.toFixed(1)}`
+            : `${de.toFixed(1)}`,
+          'debt_load'
         );
 
         // 4. Interest Coverage
@@ -759,7 +929,8 @@
           ic === null ? '— No debt / no data'
         : covTriggered
             ? `${ic.toFixed(2)}× (below ${STRUCTURAL_THRESHOLDS.interestCoverage}×)`
-            : `${ic.toFixed(2)}×`
+            : `${ic.toFixed(2)}×`,
+          'coverage'
         );
 
         const { level: srLevel, triggers: srTriggers } = calculateStructuralRisk(ov);
@@ -813,7 +984,7 @@
           capitalCard = `
             <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Capital Efficiency</span>
+                <span class="text-xs font-semibold uppercase tracking-widest text-slate-500" data-tooltip-key="roic">Capital Efficiency<span class="tip-dot">ⓘ</span></span>
                 <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 ${badgeCls}">${badgeLabel}</span>
               </div>
               <div class="space-y-2">
@@ -867,15 +1038,17 @@
      * Builds one row for the Structural Risk detail card.
      * status: 'pass' | 'fail' | 'unknown'
      */
-    function buildSRRow(label, description, status, detail) {
-      const icon   = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '—';
-      const valCls = status === 'pass'    ? 'text-sky-300'
-                   : status === 'fail'    ? 'text-slate-500'
-                   : 'text-slate-700';
+    function buildSRRow(label, description, status, detail, tooltipKey) {
+      const icon    = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '—';
+      const valCls  = status === 'pass'    ? 'text-sky-300'
+                    : status === 'fail'    ? 'text-slate-500'
+                    : 'text-slate-700';
+      const tipAttr = tooltipKey ? ` data-tooltip-key="${tooltipKey}"` : '';
+      const tipDot  = tooltipKey ? '<span class="tip-dot">ⓘ</span>' : '';
       return `
         <div class="flex justify-between items-start text-sm gap-3">
           <div>
-            <span class="text-slate-400">${label}</span>
+            <span class="text-slate-400 cursor-help"${tipAttr}>${label}${tipDot}</span>
             <span class="block text-xs text-slate-600 mt-0.5">${description}</span>
           </div>
           <span class="font-mono whitespace-nowrap ${valCls} flex-shrink-0">${icon} ${detail}</span>
@@ -1157,9 +1330,10 @@
       }
 
       // Ratio column headers (right-aligned, numeric)
+      // data-tooltip-key triggers the global floating tooltip engine.
       const colHeaders = FIELD_REGISTRY.map(f =>
-        `<th scope="col" onclick="resortTable('${f.id}')" class="${thCls(f.id, 'text-right')}">
-           ${f.label}${arrow(f.id)}
+        `<th scope="col" onclick="resortTable('${f.id}')" class="${thCls(f.id, 'text-right')}" data-tooltip-key="${f.id}">
+           ${f.label}<span class="tip-dot">ⓘ</span>${arrow(f.id)}
          </th>`
       ).join('');
 
@@ -1249,7 +1423,7 @@
                 ${colHeaders}
                 <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-center')}">Criteria Met${arrow('criteria_met')}</th>
                 <th scope="col" onclick="resortTable('structural_risk')" class="${thCls('structural_risk', 'text-center')}">Structural Risk${arrow('structural_risk')}</th>
-                <th scope="col" onclick="resortTable('roic')" class="${thCls('roic', 'text-right')}">ROIC <span class="font-normal opacity-50 normal-case tracking-normal">(vs WACC)</span>${arrow('roic')}</th>
+                <th scope="col" onclick="resortTable('roic')" class="${thCls('roic', 'text-right')}" data-tooltip-key="roic">ROIC <span class="font-normal opacity-50 normal-case tracking-normal">(vs WACC)</span><span class="tip-dot">ⓘ</span>${arrow('roic')}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
