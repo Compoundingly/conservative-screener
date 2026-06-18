@@ -24,6 +24,9 @@ const BATCH_SIZE = 5;   // concurrent FMP requests per batch
 const TICKER_LIMIT = 30; // max companies per sector scan
 
 // ── Cache helpers ────────────────────────────────────────────────────────────
+// Both functions are completely optional. VULTR_CACHE_URL / VULTR_CACHE_SECRET
+// are only read by the handler; if absent or if the VPS is unreachable, the
+// system falls back to direct FMP calls without interrupting the response.
 
 async function readCache(cacheUrl, secret, key) {
   try {
@@ -33,7 +36,9 @@ async function readCache(cacheUrl, secret, key) {
     );
     if (!res.ok) return null;
     return await res.json();
-  } catch {
+  } catch (err) {
+    // VPS unreachable or timed out — degrade gracefully, log for Vercel function logs
+    console.warn(`[cs-cache] read miss (${key}): ${err.message}`);
     return null;
   }
 }
@@ -49,20 +54,35 @@ async function writeCache(cacheUrl, secret, key, payload) {
         signal:  AbortSignal.timeout(5000),
       }
     );
-  } catch {
-    // Non-fatal: write failures degrade gracefully (fresh data is still returned)
+  } catch (err) {
+    // Non-fatal: write failures degrade gracefully — fresh data is still returned
+    console.warn(`[cs-cache] write failed (${key}): ${err.message}`);
   }
 }
 
 // ── FMP helpers ──────────────────────────────────────────────────────────────
 
+/**
+ * FMP occasionally returns HTTP 200 with an error object instead of an array
+ * e.g. { "Error Message": "Invalid API KEY." }
+ * This guard normalises both failure modes into a thrown Error.
+ */
+function assertFmpArray(data, label) {
+  if (data && typeof data === 'object' && !Array.isArray(data) && data['Error Message']) {
+    throw new Error(`Data provider error (${label}): ${data['Error Message']}`);
+  }
+  if (!Array.isArray(data)) {
+    throw new Error(`Unexpected response format from data provider (${label}).`);
+  }
+}
+
 async function fetchTickerList(sector, key) {
   const sectorParam = sector === 'default' ? '' : `&sector=${encodeURIComponent(sector)}`;
   const url = `${FMP_BASE}/stock-screener?exchange=NYSE,NASDAQ&limit=${TICKER_LIMIT}${sectorParam}&apikey=${key}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`FMP stock-screener returned HTTP ${res.status}.`);
+  if (!res.ok) throw new Error(`Data provider returned HTTP ${res.status} for sector list.`);
   const data = await res.json();
-  if (!Array.isArray(data)) throw new Error('Unexpected response from data provider.');
+  assertFmpArray(data, 'stock-screener');
   return data;
 }
 
@@ -72,6 +92,7 @@ async function fetchOneTicker(symbol, key) {
     fetch(`${FMP_BASE}/balance-sheet-statement/${symbol}?limit=1&apikey=${key}`),
   ]);
 
+  // Individual HTTP failures are silently skipped — the ticker is excluded from results
   if (!ratiosRes.ok || !balanceRes.ok) return null;
 
   const [ratiosData, balanceData] = await Promise.all([
@@ -79,8 +100,10 @@ async function fetchOneTicker(symbol, key) {
     balanceRes.json(),
   ]);
 
-  if (!Array.isArray(ratiosData) || !ratiosData.length) return null;
+  // FMP error objects or empty arrays → skip this ticker
+  if (!Array.isArray(ratiosData)  || !ratiosData.length)  return null;
   if (!Array.isArray(balanceData) || !balanceData.length) return null;
+  if (ratiosData['Error Message'] || balanceData['Error Message']) return null;
 
   const r = ratiosData[0];
   const b = balanceData[0];
@@ -105,14 +128,16 @@ async function fetchOneTicker(symbol, key) {
 }
 
 /**
- * Processes an array of tickers in sequential batches of BATCH_SIZE.
- * Uses Promise.allSettled so individual failures don't abort the batch.
+ * Processes tickers in sequential batches of BATCH_SIZE.
+ * Promise.allSettled ensures one failed ticker never aborts the batch.
+ * Returns both the enriched companies array and a count of skipped tickers.
  */
 async function batchFetchRatios(tickers, key) {
   const results = [];
+  let   skipped = 0;
 
   for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
-    const batch = tickers.slice(i, i + BATCH_SIZE);
+    const batch   = tickers.slice(i, i + BATCH_SIZE);
     const settled = await Promise.allSettled(
       batch.map(t => fetchOneTicker(t.symbol, key))
     );
@@ -120,15 +145,17 @@ async function batchFetchRatios(tickers, key) {
       const outcome = settled[j];
       if (outcome.status === 'fulfilled' && outcome.value !== null) {
         results.push({
-          symbol:      batch[j].symbol,
-          companyName: batch[j].companyName ?? batch[j].symbol,
+          symbol:         batch[j].symbol,
+          companyName:    batch[j].companyName ?? batch[j].symbol,
           observedValues: outcome.value,
         });
+      } else {
+        skipped++;
       }
     }
   }
 
-  return results;
+  return { results, skipped };
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -173,19 +200,23 @@ export default async function handler(req, res) {
   }
 
   // ── 3. Batch-fetch ratios for each ticker ──────────────────────────────────
-  const companies = await batchFetchRatios(tickerList, key);
+  const { results: companies, skipped } = await batchFetchRatios(tickerList, key);
 
   if (!companies.length) {
     return res.status(502).json({
-      error: 'Could not retrieve ratio data for any companies in this sector.',
+      error: `Retrieved the sector ticker list (${tickerList.length} companies) but could not obtain ratio data for any of them. The data provider may be rate-limiting requests — try again in a few minutes.`,
     });
   }
 
   // ── 4. Build payload ────────────────────────────────────────────────────────
   const payload = {
     sector,
-    cachedAt:  null,
+    cachedAt:       null,
     companies,
+    // Surfaces partial-result context to the UI (informational only)
+    totalRequested: tickerList.length,
+    totalReturned:  companies.length,
+    skipped,
   };
 
   // ── 5. Store in cache (non-blocking write, then set cachedAt for client) ───

@@ -691,9 +691,12 @@
         return;
       }
 
+      // Guard against re-entrant calls (e.g. rapid Enter key presses)
+      if (runBtn.disabled) return;
+
       // Loading state
-      runBtn.disabled      = true;
-      runBtn.textContent   = 'Fetching…';
+      runBtn.disabled   = true;
+      runBtn.innerHTML  = `<svg class="animate-spin inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 opacity-70" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Fetching…`;
       document.getElementById('completion-summary').classList.add('hidden');
       document.getElementById('heading-context').classList.add('hidden');
       document.getElementById('heading-date').classList.add('hidden');
@@ -717,8 +720,8 @@
             <p class="text-sm text-slate-500">${err.message || 'An unexpected error occurred. Please try again.'}</p>
           </div>`;
       } finally {
-        runBtn.disabled    = false;
-        runBtn.textContent = 'Run Filters';
+        runBtn.disabled   = false;
+        runBtn.innerHTML  = 'Run Filters';
       }
     }
 
@@ -772,8 +775,10 @@
       const dir   = field?.rankDir ?? 'asc';
       return [...companies]
         .sort((a, b) => {
-          const va = a.observedValues[sortById];
-          const vb = b.observedValues[sortById];
+          // Coerce undefined → null so both code paths are handled identically
+          const va = a.observedValues[sortById] ?? null;
+          const vb = b.observedValues[sortById] ?? null;
+          // Null values always sink to the bottom, regardless of sort direction
           if (va === null && vb === null) return 0;
           if (va === null) return 1;
           if (vb === null) return -1;
@@ -800,53 +805,59 @@
         return;
       }
 
-      // Build column header cells
+      // Column headers — right-aligned for ratio columns to match numeric cell alignment
       const colHeaders = FIELD_REGISTRY.map(f => {
         const isActive = f.id === activeSortId;
         return `<th scope="col"
                     onclick="resortTable('${f.id}')"
-                    class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-widest cursor-pointer select-none transition-colors
+                    class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors
                            ${isActive ? 'text-slate-300' : 'text-slate-600 hover:text-slate-400'}">
-                  ${f.label}${isActive ? ' ↕' : ''}
+                  ${f.label}${isActive ? ' ⇅' : ''}
                 </th>`;
       }).join('');
 
-      // Build data rows
+      // Data rows
       const rows = rankedCompanies.map(company => {
         const calcResults = runCalculationLayer(company.observedValues, activeConfig);
         const metCount    = calcResults.filter(r => r.passed === true).length;
         const total       = calcResults.length;
 
         const cells = FIELD_REGISTRY.map(f => {
-          const result  = calcResults.find(r => r.id === f.id);
-          const valStr  = formatValue(company.observedValues[f.id], f.unit);
+          const rawVal   = company.observedValues[f.id] ?? null;
+          const isNull   = rawVal === null;
+          const valStr   = formatValue(rawVal, f.unit);
           const isActive = f.id === activeSortId;
-          return `<td class="px-3 py-3 text-sm font-mono whitespace-nowrap
-                             ${isActive ? 'text-slate-200' : 'text-slate-400'}">
+          // Null values are visually de-emphasised; active sort column gets brighter text
+          const textCls  = isNull
+            ? 'text-slate-700'
+            : (isActive ? 'text-slate-200' : 'text-slate-400');
+          return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">
                     ${valStr}
                   </td>`;
         }).join('');
 
         return `
-          <tr class="border-t border-slate-800 hover:bg-slate-800/40 transition-colors">
-            <td class="px-3 py-3 text-sm font-mono text-slate-500 text-center">${company.rank}</td>
-            <td class="px-3 py-3 text-sm text-slate-300 max-w-[180px] truncate">${company.companyName}</td>
-            <td class="px-3 py-3 text-sm font-mono font-semibold text-slate-200">${company.symbol}</td>
+          <tr class="border-t border-slate-800/80 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-3 text-sm font-mono text-slate-600 text-center w-12">${company.rank}</td>
+            <td class="px-4 py-3 text-sm text-slate-300 w-48">
+              <div class="truncate max-w-[11rem]" title="${company.companyName}">${company.companyName}</div>
+            </td>
+            <td class="px-4 py-3 text-sm font-mono font-semibold text-slate-200 w-20">${company.symbol}</td>
             ${cells}
-            <td class="px-3 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap">${metCount} / ${total}</td>
+            <td class="px-4 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap">${metCount}&thinsp;/&thinsp;${total}</td>
           </tr>`;
       }).join('');
 
       container.innerHTML = `
         <div class="overflow-x-auto rounded-xl border border-slate-700/60">
-          <table class="w-full border-collapse text-left bg-brand-800">
-            <thead class="bg-brand-900/60">
-              <tr>
-                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center">Rank</th>
-                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Company</th>
-                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Ticker</th>
+          <table class="w-full min-w-[860px] border-collapse text-left bg-brand-800">
+            <thead>
+              <tr class="bg-brand-900 border-b border-slate-700/80">
+                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center w-12">Rank</th>
+                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 w-48">Company</th>
+                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 w-20">Ticker</th>
                 ${colHeaders}
-                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center">Criteria Met</th>
+                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center whitespace-nowrap">Criteria Met</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -877,11 +888,14 @@
       const errorEl   = document.getElementById('sector-error');
       const container = document.getElementById('sector-table-container');
 
+      // Guard against re-entrant calls during a long bulk fetch
+      if (scanBtn.disabled) return;
+
       errorEl.classList.add('hidden');
       errorEl.textContent = '';
 
-      scanBtn.disabled    = true;
-      scanBtn.textContent = 'Scanning…';
+      scanBtn.disabled  = true;
+      scanBtn.innerHTML = `<svg class="animate-spin inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 opacity-70" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Scanning…`;
 
       const sectorLabel = sector === 'default' ? 'General' : sector;
       document.getElementById('heading-context').textContent = `— ${sectorLabel}`;
@@ -910,9 +924,13 @@
         _sectorCompanies   = data.companies;
         _sectorName        = sector;
 
+        const dateEl = document.getElementById('heading-date');
         if (data.cachedAt) {
-          document.getElementById('heading-date').textContent = `Cached ${data.cachedAt}`;
-          document.getElementById('heading-date').classList.remove('hidden');
+          dateEl.textContent = `Cached ${new Date(data.cachedAt).toLocaleString()}`;
+          dateEl.classList.remove('hidden');
+        } else if (data.skipped > 0) {
+          dateEl.textContent = `${data.totalReturned} of ${data.totalRequested} companies returned (${data.skipped} skipped — data unavailable)`;
+          dateEl.classList.remove('hidden');
         }
 
         const ranked = rankCompanies(_sectorCompanies, sortBy);
@@ -924,8 +942,8 @@
             <p class="text-sm text-slate-500">${err.message || 'An unexpected error occurred. Please try again.'}</p>
           </div>`;
       } finally {
-        scanBtn.disabled    = false;
-        scanBtn.textContent = 'Scan Sector';
+        scanBtn.disabled  = false;
+        scanBtn.innerHTML = 'Scan Sector';
       }
     }
 
