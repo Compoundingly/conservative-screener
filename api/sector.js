@@ -1,70 +1,41 @@
 /**
- * api/sector.js — Vercel Serverless: Bulk Sector Scan
+ * api/sector.js — Vercel Serverless: Bulk Sector Scan (Alpha Vantage)
  *
  * Flow:
- *   1. Check Vultr Redis cache (via VULTR_CACHE_URL) — return immediately on hit
- *   2. Cache miss: fetch sector ticker list from FMP /stock-screener
- *   3. Batch-fetch /ratios + /balance-sheet-statement for each ticker (5 concurrent)
- *   4. Compute ltd_to_nwc server-side (same logic as api/ratios.js)
- *   5. Store result in Vultr cache with 24h TTL
+ *   1. Check Vultr Redis cache — return immediately on hit (24h TTL)
+ *   2. Cache miss: resolve curated ticker list for the requested sector
+ *   3. Batch-fetch 3 AV endpoints per ticker (OVERVIEW, BALANCE_SHEET, INCOME_STATEMENT)
+ *   4. Compute current_ratio, ltd_to_nwc, interest_coverage server-side
+ *   5. Write result to Vultr cache
  *   6. Return enriched company array to frontend
  *
  * GET /api/sector?sector=Real+Estate
  *
+ * Rate limits (Alpha Vantage free tier): 25 req/day · 5 req/min
+ * ─────────────────────────────────────────────────────────────────────────────
+ * A full sector scan (15 tickers × 3 calls = 45 requests) exceeds the free
+ * tier daily limit. Options:
+ *   • Upgrade to AV premium ($50/mo, 75 req/min, no daily cap).
+ *   • Use the Vultr VPS cache to pre-warm data via a nightly cron job.
+ *   • The `skipped` count in the response surfaces partial results gracefully.
+ *
  * Response shape:
  * {
- *   sector:    string,
- *   cachedAt:  string | null,
- *   companies: [{ symbol, companyName, observedValues: { current_ratio, ltd_to_nwc, ... } }]
+ *   sector:         string,
+ *   cachedAt:       string | null,
+ *   companies:      [{ symbol, companyName, observedValues }],
+ *   totalRequested: number,
+ *   totalReturned:  number,
+ *   skipped:        number,
  * }
  */
 
-const FMP_BASE   = 'https://financialmodelingprep.com/api/v3';
-const BATCH_SIZE = 5; // concurrent FMP requests per batch
-
-// ── Cache helpers ────────────────────────────────────────────────────────────
-// Both functions are completely optional. VULTR_CACHE_URL / VULTR_CACHE_SECRET
-// are only read by the handler; if absent or if the VPS is unreachable, the
-// system falls back to direct FMP calls without interrupting the response.
-
-async function readCache(cacheUrl, secret, key) {
-  try {
-    const res = await fetch(
-      `${cacheUrl}/cache?key=${encodeURIComponent(key)}`,
-      { headers: { 'X-Cache-Secret': secret }, signal: AbortSignal.timeout(3000) }
-    );
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (err) {
-    // VPS unreachable or timed out — degrade gracefully, log for Vercel function logs
-    console.warn(`[cs-cache] read miss (${key}): ${err.message}`);
-    return null;
-  }
-}
-
-async function writeCache(cacheUrl, secret, key, payload) {
-  try {
-    await fetch(
-      `${cacheUrl}/cache?key=${encodeURIComponent(key)}`,
-      {
-        method:  'PUT',
-        headers: { 'Content-Type': 'application/json', 'X-Cache-Secret': secret },
-        body:    JSON.stringify(payload),
-        signal:  AbortSignal.timeout(5000),
-      }
-    );
-  } catch (err) {
-    // Non-fatal: write failures degrade gracefully — fresh data is still returned
-    console.warn(`[cs-cache] write failed (${key}): ${err.message}`);
-  }
-}
+const AV_BASE    = 'https://www.alphavantage.co/query';
+const BATCH_SIZE = 3; // conservative batch size to reduce burst rate-limit hits
 
 // ── Sector ticker registry ───────────────────────────────────────────────────
-// FMP's /stock-screener endpoint requires a paid subscription (returns HTTP 403
-// on the free tier). Instead we use a curated list of large, established
-// companies per sector — appropriate for a conservative screening tool.
-// Each entry matches the companyName shape returned by FMP /ratios so the
-// rest of the pipeline is unchanged.
+// Curated lists of large, established companies per sector.
+// Appropriate for a conservative screener — stable universe, no dynamic screener call.
 
 const SECTOR_TICKERS = {
   'Real Estate': [
@@ -89,16 +60,16 @@ const SECTOR_TICKERS = {
     { symbol: 'TGT',  companyName: 'Target' },
     { symbol: 'COST', companyName: 'Costco Wholesale' },
     { symbol: 'HD',   companyName: 'Home Depot' },
-    { symbol: 'LOW',  companyName: 'Lowe\'s Companies' },
+    { symbol: 'LOW',  companyName: "Lowe's Companies" },
     { symbol: 'KR',   companyName: 'Kroger' },
     { symbol: 'DG',   companyName: 'Dollar General' },
     { symbol: 'DLTR', companyName: 'Dollar Tree' },
     { symbol: 'TJX',  companyName: 'TJX Companies' },
     { symbol: 'ROST', companyName: 'Ross Stores' },
     { symbol: 'AZO',  companyName: 'AutoZone' },
-    { symbol: 'ORLY', companyName: 'O\'Reilly Automotive' },
+    { symbol: 'ORLY', companyName: "O'Reilly Automotive" },
     { symbol: 'BBY',  companyName: 'Best Buy' },
-    { symbol: 'M',    companyName: 'Macy\'s' },
+    { symbol: 'M',    companyName: "Macy's" },
     { symbol: 'GPS',  companyName: 'Gap' },
   ],
   'Technology': [
@@ -154,72 +125,129 @@ const SECTOR_TICKERS = {
   ],
 };
 
-// ── FMP helpers ──────────────────────────────────────────────────────────────
+// ── Cache helpers ────────────────────────────────────────────────────────────
+// VULTR_CACHE_URL and VULTR_CACHE_SECRET are fully optional. If absent or if
+// the VPS is unreachable, the system falls back to direct AV calls.
+
+async function readCache(cacheUrl, secret, key) {
+  try {
+    const res = await fetch(
+      `${cacheUrl}/cache?key=${encodeURIComponent(key)}`,
+      { headers: { 'X-Cache-Secret': secret }, signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn(`[cs-cache] read miss (${key}): ${err.message}`);
+    return null;
+  }
+}
+
+async function writeCache(cacheUrl, secret, key, payload) {
+  try {
+    await fetch(
+      `${cacheUrl}/cache?key=${encodeURIComponent(key)}`,
+      {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Cache-Secret': secret },
+        body:    JSON.stringify(payload),
+        signal:  AbortSignal.timeout(5000),
+      }
+    );
+  } catch (err) {
+    console.warn(`[cs-cache] write failed (${key}): ${err.message}`);
+  }
+}
+
+// ── Alpha Vantage helpers ────────────────────────────────────────────────────
+
+/** Coerces AV string numbers; "None" and missing values → null. */
+function parseNum(val) {
+  if (val === null || val === undefined || val === 'None' || val === '-') return null;
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+}
+
+/** Returns true if AV responded with a rate-limit or key-error envelope. */
+function isAvRateLimited(data) {
+  return !!(data?.Note || data?.Information);
+}
 
 /**
- * FMP occasionally returns HTTP 200 with an error object instead of an array
- * e.g. { "Error Message": "Invalid API KEY." }
- * This guard normalises both failure modes into a thrown Error.
+ * Derives the 5 observed values from parsed AV response objects.
+ * Pure computation — no fetching or DOM access.
  */
-function assertFmpArray(data, label) {
-  if (data && typeof data === 'object' && !Array.isArray(data) && data['Error Message']) {
-    throw new Error(`Data provider error (${label}): ${data['Error Message']}`);
-  }
-  if (!Array.isArray(data)) {
-    throw new Error(`Unexpected response format from data provider (${label}).`);
-  }
-}
+function computeObservedValues(overview, bs, is_) {
+  const tca    = parseNum(bs.totalCurrentAssets);
+  const tcl    = parseNum(bs.totalCurrentLiabilities);
+  const ltd    = parseNum(bs.longTermDebt);
+  const ebit   = parseNum(is_.ebit);
+  const intExp = parseNum(is_.interestAndDebtExpense)
+              ?? parseNum(is_.interestExpense); // fallback field name
 
-function getTickerList(sector) {
-  const list = SECTOR_TICKERS[sector] ?? SECTOR_TICKERS.default;
-  return list;
-}
+  const currentRatio = (tca !== null && tcl !== null && tcl !== 0)
+    ? tca / tcl : null;
 
-async function fetchOneTicker(symbol, key) {
-  const [ratiosRes, balanceRes] = await Promise.all([
-    fetch(`${FMP_BASE}/ratios/${symbol}?limit=1&apikey=${key}`),
-    fetch(`${FMP_BASE}/balance-sheet-statement/${symbol}?limit=1&apikey=${key}`),
-  ]);
+  const nwc      = (tca !== null && tcl !== null) ? tca - tcl : null;
+  const ltdToNwc = (ltd !== null && nwc !== null && nwc !== 0)
+    ? ltd / nwc : null;
 
-  // Individual HTTP failures are silently skipped — the ticker is excluded from results
-  if (!ratiosRes.ok || !balanceRes.ok) return null;
-
-  const [ratiosData, balanceData] = await Promise.all([
-    ratiosRes.json(),
-    balanceRes.json(),
-  ]);
-
-  // FMP error objects or empty arrays → skip this ticker
-  if (!Array.isArray(ratiosData)  || !ratiosData.length)  return null;
-  if (!Array.isArray(balanceData) || !balanceData.length) return null;
-  if (ratiosData['Error Message'] || balanceData['Error Message']) return null;
-
-  const r = ratiosData[0];
-  const b = balanceData[0];
-
-  const totalCurrentAssets      = b.totalCurrentAssets      ?? null;
-  const totalCurrentLiabilities = b.totalCurrentLiabilities ?? null;
-  const longTermDebt             = b.longTermDebt            ?? null;
-
-  let ltdToNwc = null;
-  if (totalCurrentAssets !== null && totalCurrentLiabilities !== null && longTermDebt !== null) {
-    const nwc = totalCurrentAssets - totalCurrentLiabilities;
-    ltdToNwc  = nwc !== 0 ? longTermDebt / nwc : null;
-  }
+  const interestCoverage = (ebit !== null && intExp !== null && intExp !== 0)
+    ? ebit / intExp : null;
 
   return {
-    current_ratio:     r.currentRatio       ?? null,
+    current_ratio:     currentRatio,
     ltd_to_nwc:        ltdToNwc,
-    interest_coverage: r.interestCoverage   ?? null,
-    price_to_book:     r.priceToBookRatio   ?? null,
-    price_to_earnings: r.priceEarningsRatio ?? null,
+    interest_coverage: interestCoverage,
+    price_to_book:     parseNum(overview.PriceToBookRatio),
+    price_to_earnings: parseNum(overview.PERatio),
   };
 }
 
 /**
+ * Fetches all three AV endpoints for one ticker.
+ * Returns null (ticker is skipped) on any failure or rate-limit response.
+ */
+async function fetchOneTicker(symbol, key) {
+  let overviewRes, balanceRes, incomeRes;
+
+  try {
+    [overviewRes, balanceRes, incomeRes] = await Promise.all([
+      fetch(`${AV_BASE}?function=OVERVIEW&symbol=${symbol}&apikey=${key}`),
+      fetch(`${AV_BASE}?function=BALANCE_SHEET&symbol=${symbol}&apikey=${key}`),
+      fetch(`${AV_BASE}?function=INCOME_STATEMENT&symbol=${symbol}&apikey=${key}`),
+    ]);
+  } catch {
+    return null;
+  }
+
+  if (!overviewRes.ok || !balanceRes.ok || !incomeRes.ok) return null;
+
+  const [overview, balance, income] = await Promise.all([
+    overviewRes.json(),
+    balanceRes.json(),
+    incomeRes.json(),
+  ]);
+
+  // Rate-limited or key error → skip ticker, do not abort the whole batch
+  if (isAvRateLimited(overview) || isAvRateLimited(balance) || isAvRateLimited(income)) {
+    console.warn(`[av] rate-limited on ${symbol}`);
+    return null;
+  }
+
+  // AV returns an empty object {} for unknown symbols
+  if (!overview.Symbol) return null;
+
+  const bs  = balance.annualReports?.[0]  ?? {};
+  const is_ = income.annualReports?.[0]   ?? {};
+
+  return computeObservedValues(overview, bs, is_);
+}
+
+/**
  * Processes tickers in sequential batches of BATCH_SIZE.
- * Promise.allSettled ensures one failed ticker never aborts the batch.
- * Returns both the enriched companies array and a count of skipped tickers.
+ * Promise.allSettled prevents one failed ticker from aborting the batch.
+ * Returns { results, skipped } for partial-result surfacing in the response.
  */
 async function batchFetchRatios(tickers, key) {
   const results = [];
@@ -254,7 +282,7 @@ export default async function handler(req, res) {
 
   const { sector = 'default' } = req.query;
 
-  const key         = process.env.FMP_API_KEY;
+  const key         = process.env.ALPHA_VANTAGE_API_KEY;
   const cacheUrl    = process.env.VULTR_CACHE_URL;
   const cacheSecret = process.env.VULTR_CACHE_SECRET;
 
@@ -264,18 +292,16 @@ export default async function handler(req, res) {
     });
   }
 
-  const cacheKey = `sector:${sector}`;
+  const cacheKey = `av:sector:${sector}`;
 
   // ── 1. Check Vultr cache ────────────────────────────────────────────────────
   if (cacheUrl && cacheSecret) {
     const cached = await readCache(cacheUrl, cacheSecret, cacheKey);
-    if (cached) {
-      return res.status(200).json(cached);
-    }
+    if (cached) return res.status(200).json(cached);
   }
 
-  // ── 2. Resolve ticker list from curated registry ───────────────────────────
-  const tickerList = getTickerList(sector);
+  // ── 2. Resolve curated ticker list ─────────────────────────────────────────
+  const tickerList = SECTOR_TICKERS[sector] ?? SECTOR_TICKERS.default;
 
   if (!tickerList.length) {
     return res.status(404).json({
@@ -283,27 +309,28 @@ export default async function handler(req, res) {
     });
   }
 
-  // ── 3. Batch-fetch ratios for each ticker ──────────────────────────────────
+  // ── 3. Batch-fetch from Alpha Vantage ──────────────────────────────────────
   const { results: companies, skipped } = await batchFetchRatios(tickerList, key);
 
   if (!companies.length) {
-    return res.status(502).json({
-      error: `Retrieved the sector ticker list (${tickerList.length} companies) but could not obtain ratio data for any of them. The data provider may be rate-limiting requests — try again in a few minutes.`,
+    return res.status(429).json({
+      error:
+        `Retrieved ${tickerList.length} tickers for this sector but could not obtain ` +
+        'ratio data for any of them. The Alpha Vantage free tier allows 25 requests/day ' +
+        'and 5/min. Wait a minute and try again, or upgrade your API plan.',
     });
   }
 
-  // ── 4. Build payload ────────────────────────────────────────────────────────
+  // ── 4. Build and cache payload ─────────────────────────────────────────────
   const payload = {
     sector,
     cachedAt:       null,
     companies,
-    // Surfaces partial-result context to the UI (informational only)
     totalRequested: tickerList.length,
     totalReturned:  companies.length,
     skipped,
   };
 
-  // ── 5. Store in cache (non-blocking write, then set cachedAt for client) ───
   if (cacheUrl && cacheSecret) {
     await writeCache(cacheUrl, cacheSecret, cacheKey, {
       ...payload,
