@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conservative Screener — Compoundingly</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50:  '#f8fafc',
+              100: '#f1f5f9',
+              200: '#e2e8f0',
+              300: '#cbd5e1',
+              400: '#94a3b8',
+              500: '#64748b',
+              600: '#475569',
+              700: '#334155',
+              800: '#1e293b',
+              900: '#0f172a',
+            },
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* Subtle backdrop blur shimmer for the modal overlay */
+    #disclaimer-overlay {
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* Thin scrollbar for modal body */
+    #disclaimer-body::-webkit-scrollbar {
+      width: 4px;
+    }
+    #disclaimer-body::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    #disclaimer-body::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 2px;
+    }
+
+    /* Checkbox custom style */
+    #ack-checkbox:checked {
+      accent-color: #475569;
+    }
+
+    /* CTA button lock animation */
+    @keyframes unlock-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(100,116,139,0.4); }
+      70%  { box-shadow: 0 0 0 8px rgba(100,116,139,0); }
+      100% { box-shadow: 0 0 0 0 rgba(100,116,139,0); }
+    }
+    #cta-btn.unlocked {
+      animation: unlock-pulse 0.5s ease-out;
+    }
+
+    /* Dashboard fade-in */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in {
+      animation: fadeIn 0.35s ease-out forwards;
+    }
+  </style>
+</head>
+
+<body class="h-full bg-brand-900 text-slate-300 font-sans antialiased">
+
+  <!-- =====================================================================
+       LEGAL DISCLAIMER MODAL
+       Covers 100% of the viewport. Dismissed only via explicit acknowledgement.
+       ===================================================================== -->
+  <div
+    id="disclaimer-overlay"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/90 px-4 py-6"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modal-title"
+    aria-describedby="modal-body-text"
+  >
+    <div
+      class="relative w-full max-w-2xl flex flex-col bg-brand-800 border border-slate-600/50 rounded-2xl shadow-2xl overflow-hidden"
+      style="max-height: 92vh;"
+    >
+
+      <!-- Modal header -->
+      <div class="flex-shrink-0 border-b border-slate-700 px-8 pt-8 pb-6">
+        <!-- Wordmark row -->
+        <div class="flex items-center gap-2.5 mb-6">
+          <div class="h-7 w-7 rounded-md bg-slate-600 flex items-center justify-center">
+            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.8"/>
+              <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.3"/>
+            </svg>
+          </div>
+          <span class="text-sm font-semibold text-slate-300 tracking-wide uppercase">Compoundingly</span>
+          <span class="mx-1 text-slate-600">·</span>
+          <span class="text-sm text-slate-500 tracking-wide">Conservative Screener</span>
+        </div>
+
+        <!-- Title block -->
+        <div class="flex items-start gap-3">
+          <div class="flex-shrink-0 mt-0.5">
+            <svg class="w-5 h-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div>
+            <h1 id="modal-title" class="text-lg font-semibold text-slate-100 leading-snug">
+              Important Notice — Please Read Before Continuing
+            </h1>
+            <p class="mt-1 text-xs font-medium text-slate-500 uppercase tracking-widest">
+              Not Financial Advice &nbsp;·&nbsp; Informational Use Only
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal scrollable body -->
+      <div
+        id="disclaimer-body"
+        class="flex-1 overflow-y-auto px-8 py-6 space-y-5 text-sm leading-relaxed text-slate-400"
+      >
+
+        <!-- Section 1 -->
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">1. Nature of This Tool</h2>
+          <p>
+            The Conservative Screener (the "Tool") is a <strong class="text-slate-300 font-medium">mathematical calculation engine</strong>.
+            It applies user-defined or pre-configured quantitative filters to publicly available financial data.
+            All outputs are the result of arithmetic operations — ratios, comparisons, and threshold checks — applied mechanically and without judgment.
+          </p>
+          <p class="mt-2">
+            The Tool does <strong class="text-slate-300 font-medium">not</strong> constitute, and must not be interpreted as,
+            financial advice, investment advice, trading recommendations, securities analysis, research, or any solicitation to buy,
+            sell, hold, or otherwise transact in any financial instrument or asset class.
+          </p>
+        </section>
+
+        <!-- Section 2 -->
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">2. No Financial Advice</h2>
+          <p>
+            Compoundingly and its operators are <strong class="text-slate-300 font-medium">not registered investment advisers</strong>,
+            broker-dealers, financial planners, or analysts under any jurisdiction. No content generated by this Tool,
+            including but not limited to filter outputs, completion rates, data tables, or threshold comparisons,
+            should be construed as a personalised recommendation, endorsement, or professional opinion regarding
+            any security, company, or financial decision.
+          </p>
+        </section>
+
+        <!-- Section 3 -->
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">3. Accuracy & Data Limitations</h2>
+          <p>
+            Financial data displayed in this Tool is sourced from third-party providers and may contain errors,
+            omissions, or significant delays. Calculated ratios and filter results depend entirely on the quality
+            and timeliness of the underlying data. The Tool makes <strong class="text-slate-300 font-medium">no representation or warranty</strong>,
+            express or implied, as to the accuracy, completeness, or fitness for any purpose of any data, calculation, or output.
+          </p>
+          <p class="mt-2">
+            Past filter results, historical ratio trends, or any displayed data are presented purely for informational
+            context and are <strong class="text-slate-300 font-medium">not indicative of future results</strong>.
+          </p>
+        </section>
+
+        <!-- Section 4 -->
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">4. Assumption of Risk</h2>
+          <p>
+            All investing and trading activity involves substantial risk of loss. By using this Tool, you acknowledge
+            that you are solely responsible for all decisions made in reliance on, or in connection with, the outputs
+            produced herein. Compoundingly and its affiliates shall bear no liability for any direct, indirect,
+            consequential, or incidental loss arising from the use of this Tool or the data it displays.
+          </p>
+        </section>
+
+        <!-- Section 5 -->
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">5. Jurisdiction</h2>
+          <p>
+            This Tool is not directed at, and may not be appropriate for, residents of all jurisdictions.
+            It is your responsibility to ensure that your use of this Tool complies with all applicable laws
+            and regulations in your jurisdiction. Nothing herein constitutes an offer or solicitation in any
+            jurisdiction where such offer or solicitation is unlawful.
+          </p>
+        </section>
+
+        <!-- Section 6 -->
+        <section>
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">6. Independent Verification</h2>
+          <p>
+            You are strongly encouraged to verify all data independently, consult qualified financial,
+            legal, and tax professionals before making any financial decisions, and conduct your own
+            due diligence. The outputs of this Tool are a <em>starting point for research</em>,
+            not a substitute for professional analysis.
+          </p>
+        </section>
+
+        <!-- Divider -->
+        <div class="border-t border-slate-700/60 pt-4">
+          <p class="text-xs text-slate-600 italic">
+            By clicking "I Understand and Continue" below, you confirm that you have read, understood, and agree
+            to the terms set out in this notice, and that you will use the Tool solely for informational and
+            educational purposes.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Modal footer — acknowledgement + CTA -->
+      <div class="flex-shrink-0 border-t border-slate-700 px-8 py-6 space-y-4 bg-brand-800/80">
+
+        <!-- Checkbox acknowledgement -->
+        <label class="flex items-start gap-3 cursor-pointer select-none group">
+          <div class="flex-shrink-0 mt-0.5">
+            <input
+              id="ack-checkbox"
+              type="checkbox"
+              class="w-4 h-4 rounded border-slate-600 bg-brand-900 cursor-pointer"
+              onchange="handleCheckbox(this)"
+            />
+          </div>
+          <span class="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+            I confirm that I have read and understood the above notice.
+            I acknowledge that this Tool does not provide financial advice and I will not rely on it
+            as the basis for any financial decision.
+          </span>
+        </label>
+
+        <!-- CTA button -->
+        <button
+          id="cta-btn"
+          disabled
+          onclick="dismissDisclaimer()"
+          class="w-full py-3.5 px-6 rounded-xl text-sm font-semibold tracking-wide
+                 bg-slate-700 text-slate-500 cursor-not-allowed
+                 border border-slate-600/40
+                 transition-all duration-200"
+        >
+          I Understand and Continue
+        </button>
+
+        <p class="text-center text-xs text-slate-600">
+          If you do not agree, please close this browser tab.
+        </p>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =====================================================================
+       MAIN DASHBOARD (visible after disclaimer is dismissed)
+       ===================================================================== -->
+  <div id="main-dashboard" class="hidden min-h-screen flex flex-col">
+
+    <!-- Top navigation bar -->
+    <header class="flex-shrink-0 border-b border-slate-800 bg-brand-900/95 backdrop-blur-sm sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+
+        <!-- Left: Wordmark -->
+        <div class="flex items-center gap-2.5">
+          <div class="h-6 w-6 rounded bg-slate-700 flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-slate-300" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.8"/>
+              <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.3"/>
+            </svg>
+          </div>
+          <span class="text-sm font-semibold text-slate-300 tracking-wide">Compoundingly</span>
+          <span class="text-slate-700 mx-1">/</span>
+          <span class="text-sm text-slate-500">Conservative Screener</span>
+        </div>
+
+        <!-- Right: Status badge -->
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+            Informational Use Only
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
+
+      <!-- Page heading -->
+      <div class="mb-8 fade-in">
+        <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
+        <p class="mt-1.5 text-sm text-slate-500 max-w-xl">
+          Apply mathematical threshold criteria to publicly available financial data.
+          All outputs represent arithmetic comparisons only and do not constitute financial advice.
+        </p>
+      </div>
+
+      <!-- Placeholder filter cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fade-in">
+
+        <!-- Card: Liquidity Stress Test -->
+        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Liquidity Stress Test</span>
+            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Current Ratio</span>
+              <span class="font-mono text-slate-300">2.41 <span class="text-slate-600">≥ 2.00</span></span>
+            </div>
+            <div class="w-full h-px bg-slate-700/50"></div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Quick Ratio</span>
+              <span class="font-mono text-slate-300">1.87 <span class="text-slate-600">≥ 1.00</span></span>
+            </div>
+          </div>
+          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>2 / 2 criteria met</span>
+          </div>
+        </div>
+
+        <!-- Card: Capital Structure Filter -->
+        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Capital Structure Filter</span>
+            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Unmet</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Debt-to-Equity</span>
+              <span class="font-mono text-slate-300">1.92 <span class="text-slate-600">≤ 1.00</span></span>
+            </div>
+            <div class="w-full h-px bg-slate-700/50"></div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Interest Coverage</span>
+              <span class="font-mono text-slate-300">4.10 <span class="text-slate-600">≥ 3.00</span></span>
+            </div>
+          </div>
+          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>1 / 2 criteria met</span>
+          </div>
+        </div>
+
+        <!-- Card: Earnings Consistency Check -->
+        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Earnings Consistency Check</span>
+            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">EPS (TTM)</span>
+              <span class="font-mono text-slate-300">3.22 <span class="text-slate-600">&gt; 0</span></span>
+            </div>
+            <div class="w-full h-px bg-slate-700/50"></div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Positive EPS (10 yr)</span>
+              <span class="font-mono text-slate-300">10 / 10</span>
+            </div>
+          </div>
+          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>2 / 2 criteria met</span>
+          </div>
+        </div>
+
+        <!-- Card: Dividend Continuity Check -->
+        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dividend Continuity Check</span>
+            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Consecutive Dividend Years</span>
+              <span class="font-mono text-slate-300">22 <span class="text-slate-600">≥ 20</span></span>
+            </div>
+            <div class="w-full h-px bg-slate-700/50"></div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Payout Ratio</span>
+              <span class="font-mono text-slate-300">38% <span class="text-slate-600">≤ 60%</span></span>
+            </div>
+          </div>
+          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>2 / 2 criteria met</span>
+          </div>
+        </div>
+
+        <!-- Card: Valuation Ratio Filter -->
+        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Valuation Ratio Filter</span>
+            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Unmet</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">P/E Ratio</span>
+              <span class="font-mono text-slate-300">24.1 <span class="text-slate-600">≤ 15.0</span></span>
+            </div>
+            <div class="w-full h-px bg-slate-700/50"></div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">P/B Ratio</span>
+              <span class="font-mono text-slate-300">3.8 <span class="text-slate-600">≤ 1.5</span></span>
+            </div>
+          </div>
+          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>0 / 2 criteria met</span>
+          </div>
+        </div>
+
+        <!-- Card: Asset Backing Assessment -->
+        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Asset Backing Assessment</span>
+            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Net Asset Value / Share</span>
+              <span class="font-mono text-slate-300">$18.44 <span class="text-slate-600">&gt; $10</span></span>
+            </div>
+            <div class="w-full h-px bg-slate-700/50"></div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">Working Capital Positive</span>
+              <span class="font-mono text-slate-300">Pass</span>
+            </div>
+          </div>
+          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <span>2 / 2 criteria met</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Overall completion rate summary -->
+      <div class="mt-6 bg-brand-800 border border-slate-700/60 rounded-xl p-5 fade-in">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">Overall Completion Rate</p>
+            <p class="text-sm text-slate-400">
+              Mathematical ratio of satisfied criteria to total criteria evaluated across all active filters.
+              This value is an arithmetic representation only and does not constitute a rating or recommendation.
+            </p>
+          </div>
+          <div class="flex-shrink-0 text-right">
+            <p class="text-3xl font-mono font-semibold text-slate-200">8 <span class="text-slate-600 text-lg">/</span> 12</p>
+            <p class="text-xs text-slate-500 mt-0.5 font-mono">67% criteria met</p>
+          </div>
+        </div>
+        <!-- Progress bar (neutral) -->
+        <div class="mt-4 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+          <div class="h-full bg-slate-500 rounded-full" style="width: 67%;"></div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="flex-shrink-0 border-t border-slate-800 py-4 px-6">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+        <span>© 2026 Compoundingly. All data is for informational and mathematical purposes only.</span>
+        <span class="font-medium">NOT FINANCIAL ADVICE</span>
+      </div>
+    </footer>
+
+  </div>
+
+
+  <!-- =====================================================================
+       JAVASCRIPT — Modal logic
+       ===================================================================== -->
+  <script>
+    /**
+     * Enables the CTA button when the acknowledgement checkbox is checked.
+     * The button remains disabled (and visually locked) until the user
+     * explicitly confirms they have read the disclaimer.
+     */
+    function handleCheckbox(checkbox) {
+      const btn = document.getElementById('cta-btn');
+      if (checkbox.checked) {
+        btn.disabled = false;
+        btn.classList.remove(
+          'bg-slate-700', 'text-slate-500', 'cursor-not-allowed', 'border-slate-600/40'
+        );
+        btn.classList.add(
+          'bg-slate-600', 'text-slate-100', 'cursor-pointer',
+          'border-slate-500', 'hover:bg-slate-500', 'hover:border-slate-400',
+          'unlocked'
+        );
+      } else {
+        btn.disabled = true;
+        btn.classList.add(
+          'bg-slate-700', 'text-slate-500', 'cursor-not-allowed', 'border-slate-600/40'
+        );
+        btn.classList.remove(
+          'bg-slate-600', 'text-slate-100', 'cursor-pointer',
+          'border-slate-500', 'hover:bg-slate-500', 'hover:border-slate-400',
+          'unlocked'
+        );
+      }
+    }
+
+    /**
+     * Dismisses the disclaimer overlay and reveals the main dashboard.
+     * Only callable when the CTA button is enabled (checkbox checked).
+     *
+     * Records acknowledgement in sessionStorage so a page reload within
+     * the same browser session does not re-prompt the user.
+     */
+    function dismissDisclaimer() {
+      const overlay = document.getElementById('disclaimer-overlay');
+      const dashboard = document.getElementById('main-dashboard');
+
+      // Animate overlay out
+      overlay.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      overlay.style.opacity = '0';
+      overlay.style.transform = 'scale(1.02)';
+
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        overlay.setAttribute('aria-hidden', 'true');
+        dashboard.classList.remove('hidden');
+        sessionStorage.setItem('disclaimerAcknowledged', 'true');
+      }, 300);
+    }
+
+    /**
+     * On page load: if the user already acknowledged the disclaimer in
+     * the current browser session, skip the modal entirely.
+     */
+    (function init() {
+      if (sessionStorage.getItem('disclaimerAcknowledged') === 'true') {
+        document.getElementById('disclaimer-overlay').style.display = 'none';
+        document.getElementById('main-dashboard').classList.remove('hidden');
+      }
+    })();
+  </script>
+
+</body>
+</html>
