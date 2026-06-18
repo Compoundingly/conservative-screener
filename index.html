@@ -769,6 +769,21 @@
       'Financials':        { current_ratio: 1.0, debt_to_equity: 1200, price_to_book: 2.0,  price_to_earnings: 15.0 },
     };
 
+    // Maps each sector dropdown value to its representative SPDR Select Sector ETF ticker.
+    // Used by the Sector Macro Trend banner (api/trend.js).
+    const SECTOR_ETF_MAP = {
+      'Consumer Staples': 'XLP',
+      'Energy':           'XLE',
+      'Financials':       'XLF',
+      'Healthcare':       'XLV',
+      'Industrials':      'XLI',
+      'Real Estate':      'XLRE',
+      'Retail':           'XRT',
+      'Technology':       'XLK',
+      'Utilities':        'XLU',
+      'default':          'SPY',
+    };
+
     /**
      * Tightens each threshold by the Margin of Safety fraction.
      * Operators with upper bounds (<=) are reduced; lower bounds (>=) are raised.
@@ -1401,6 +1416,53 @@
       return data;
     }
 
+    /**
+     * Fetches 3-month momentum and SMA200 status for a sector ETF from /api/trend.
+     * Returns the JSON payload or throws on non-OK response.
+     */
+    async function fetchSectorTrend(etfTicker) {
+      const res  = await fetch(`/api/trend?ticker=${encodeURIComponent(etfTicker)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Trend data unavailable');
+      return data;
+    }
+
+    /**
+     * Prepends a single-line terminal-style Sector Macro Trend banner to the
+     * top of the sector results container. Called after renderSectorTable().
+     *
+     * @param {HTMLElement} container - The #sector-table-container element
+     * @param {Object}      trend     - Response from /api/trend
+     * @param {string}      etfTicker - e.g. "XLK"
+     */
+    function injectTrendBanner(container, trend, etfTicker) {
+      const mom       = trend.momentum3m;
+      const sign      = mom >= 0 ? '+' : '';
+      const flowColor = mom >= 0 ? 'text-emerald-400' : 'text-rose-400';
+      const flowEmoji = mom >= 0 ? '🟢' : '🔴';
+      const trendLabel = trend.aboveSMA200 ? 'ABOVE SMA200' : 'BELOW SMA200';
+      const trendNote  = trend.aboveSMA200
+        ? '(Current &gt; SMA200)'
+        : '(Current &lt; SMA200)';
+
+      const banner = `
+        <div class="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-700/60 bg-slate-900/60 font-mono text-xs text-slate-400 overflow-x-auto whitespace-nowrap">
+          <span class="text-slate-500 tracking-widest uppercase">Sector Macro</span>
+          <span class="text-slate-600">|</span>
+          <span class="font-semibold text-slate-300">(${etfTicker})</span>
+          <span class="text-slate-600">|</span>
+          <span>3M Flow:</span>
+          <span class="${flowColor} font-semibold">${sign}${mom.toFixed(2)}%</span>
+          <span>${flowEmoji}</span>
+          <span class="text-slate-600">|</span>
+          <span>Trend:</span>
+          <span class="font-semibold text-slate-300">${trendLabel}</span>
+          <span class="text-slate-600 font-normal">${trendNote}</span>
+        </div>`;
+
+      container.insertAdjacentHTML('afterbegin', banner);
+    }
+
     // ── VITALITY CHECK ENGINE ────────────────────────────────────────────────────
     /**
      * Evaluates top-line growth and capital efficiency against fixed thresholds.
@@ -1772,8 +1834,17 @@
           Scanning <span class="font-mono ml-1 text-slate-400">${sectorLabel}</span>…
         </div>`;
 
+      const etfTicker = SECTOR_ETF_MAP[sector] ?? 'SPY';
+
       try {
-        const data         = await fetchSector(sector);
+        // Fire sector data and ETF trend in parallel; a trend failure never blocks the scan
+        const [sectorResult, trendResult] = await Promise.allSettled([
+          fetchSector(sector),
+          fetchSectorTrend(etfTicker),
+        ]);
+
+        if (sectorResult.status === 'rejected') throw sectorResult.reason;
+        const data         = sectorResult.value;
         _sectorCompanies   = data.companies;
         _sectorName        = sector;
 
@@ -1792,6 +1863,11 @@
 
         const ranked = rankCompanies(_sectorCompanies, _sortState.id, _sortState.dir, activeConfig);
         renderSectorTable(ranked, _sortState, activeConfig);
+
+        // Prepend the Sector Macro Trend banner above the results table (silent on failure)
+        if (trendResult.status === 'fulfilled') {
+          injectTrendBanner(container, trendResult.value, etfTicker);
+        }
       } catch (err) {
         _sectorCompanies = null;
         container.innerHTML = `
