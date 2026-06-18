@@ -46,7 +46,7 @@ const SECTOR_TICKERS = {
     { symbol: 'VTR',  companyName: 'Ventas' },
     { symbol: 'NNN',  companyName: 'NNN REIT' },
     { symbol: 'ARE',  companyName: 'Alexandria Real Estate' },
-    { symbol: 'SBA',  companyName: 'SBA Communications' },
+    { symbol: 'SBAC', companyName: 'SBA Communications' },
     { symbol: 'CBRE', companyName: 'CBRE Group' },
   ],
   'Retail': [
