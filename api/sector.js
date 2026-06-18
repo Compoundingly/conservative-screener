@@ -20,8 +20,7 @@
  */
 
 const FMP_BASE   = 'https://financialmodelingprep.com/api/v3';
-const BATCH_SIZE = 5;   // concurrent FMP requests per batch
-const TICKER_LIMIT = 30; // max companies per sector scan
+const BATCH_SIZE = 5; // concurrent FMP requests per batch
 
 // ── Cache helpers ────────────────────────────────────────────────────────────
 // Both functions are completely optional. VULTR_CACHE_URL / VULTR_CACHE_SECRET
@@ -60,6 +59,101 @@ async function writeCache(cacheUrl, secret, key, payload) {
   }
 }
 
+// ── Sector ticker registry ───────────────────────────────────────────────────
+// FMP's /stock-screener endpoint requires a paid subscription (returns HTTP 403
+// on the free tier). Instead we use a curated list of large, established
+// companies per sector — appropriate for a conservative screening tool.
+// Each entry matches the companyName shape returned by FMP /ratios so the
+// rest of the pipeline is unchanged.
+
+const SECTOR_TICKERS = {
+  'Real Estate': [
+    { symbol: 'O',    companyName: 'Realty Income' },
+    { symbol: 'SPG',  companyName: 'Simon Property Group' },
+    { symbol: 'PLD',  companyName: 'Prologis' },
+    { symbol: 'AMT',  companyName: 'American Tower' },
+    { symbol: 'CCI',  companyName: 'Crown Castle' },
+    { symbol: 'WELL', companyName: 'Welltower' },
+    { symbol: 'AVB',  companyName: 'AvalonBay Communities' },
+    { symbol: 'EQR',  companyName: 'Equity Residential' },
+    { symbol: 'PSA',  companyName: 'Public Storage' },
+    { symbol: 'DLR',  companyName: 'Digital Realty' },
+    { symbol: 'VTR',  companyName: 'Ventas' },
+    { symbol: 'NNN',  companyName: 'NNN REIT' },
+    { symbol: 'ARE',  companyName: 'Alexandria Real Estate' },
+    { symbol: 'SBA',  companyName: 'SBA Communications' },
+    { symbol: 'CBRE', companyName: 'CBRE Group' },
+  ],
+  'Retail': [
+    { symbol: 'WMT',  companyName: 'Walmart' },
+    { symbol: 'TGT',  companyName: 'Target' },
+    { symbol: 'COST', companyName: 'Costco Wholesale' },
+    { symbol: 'HD',   companyName: 'Home Depot' },
+    { symbol: 'LOW',  companyName: 'Lowe\'s Companies' },
+    { symbol: 'KR',   companyName: 'Kroger' },
+    { symbol: 'DG',   companyName: 'Dollar General' },
+    { symbol: 'DLTR', companyName: 'Dollar Tree' },
+    { symbol: 'TJX',  companyName: 'TJX Companies' },
+    { symbol: 'ROST', companyName: 'Ross Stores' },
+    { symbol: 'AZO',  companyName: 'AutoZone' },
+    { symbol: 'ORLY', companyName: 'O\'Reilly Automotive' },
+    { symbol: 'BBY',  companyName: 'Best Buy' },
+    { symbol: 'M',    companyName: 'Macy\'s' },
+    { symbol: 'GPS',  companyName: 'Gap' },
+  ],
+  'Technology': [
+    { symbol: 'AAPL',  companyName: 'Apple' },
+    { symbol: 'MSFT',  companyName: 'Microsoft' },
+    { symbol: 'ORCL',  companyName: 'Oracle' },
+    { symbol: 'IBM',   companyName: 'IBM' },
+    { symbol: 'CSCO',  companyName: 'Cisco Systems' },
+    { symbol: 'TXN',   companyName: 'Texas Instruments' },
+    { symbol: 'QCOM',  companyName: 'Qualcomm' },
+    { symbol: 'AVGO',  companyName: 'Broadcom' },
+    { symbol: 'ADI',   companyName: 'Analog Devices' },
+    { symbol: 'AMAT',  companyName: 'Applied Materials' },
+    { symbol: 'KLAC',  companyName: 'KLA Corporation' },
+    { symbol: 'MSI',   companyName: 'Motorola Solutions' },
+    { symbol: 'JNPR',  companyName: 'Juniper Networks' },
+    { symbol: 'HPQ',   companyName: 'HP Inc.' },
+    { symbol: 'NTAP',  companyName: 'NetApp' },
+  ],
+  'Utilities': [
+    { symbol: 'NEE',  companyName: 'NextEra Energy' },
+    { symbol: 'DUK',  companyName: 'Duke Energy' },
+    { symbol: 'SO',   companyName: 'Southern Company' },
+    { symbol: 'AEP',  companyName: 'American Electric Power' },
+    { symbol: 'EXC',  companyName: 'Exelon' },
+    { symbol: 'XEL',  companyName: 'Xcel Energy' },
+    { symbol: 'SRE',  companyName: 'Sempra' },
+    { symbol: 'PEG',  companyName: 'Public Service Enterprise' },
+    { symbol: 'ED',   companyName: 'Consolidated Edison' },
+    { symbol: 'WEC',  companyName: 'WEC Energy Group' },
+    { symbol: 'ETR',  companyName: 'Entergy' },
+    { symbol: 'FE',   companyName: 'FirstEnergy' },
+    { symbol: 'CNP',  companyName: 'CenterPoint Energy' },
+    { symbol: 'PPL',  companyName: 'PPL Corporation' },
+    { symbol: 'AES',  companyName: 'AES Corporation' },
+  ],
+  default: [
+    { symbol: 'AAPL', companyName: 'Apple' },
+    { symbol: 'MSFT', companyName: 'Microsoft' },
+    { symbol: 'JNJ',  companyName: 'Johnson & Johnson' },
+    { symbol: 'PG',   companyName: 'Procter & Gamble' },
+    { symbol: 'KO',   companyName: 'Coca-Cola' },
+    { symbol: 'WMT',  companyName: 'Walmart' },
+    { symbol: 'JPM',  companyName: 'JPMorgan Chase' },
+    { symbol: 'XOM',  companyName: 'ExxonMobil' },
+    { symbol: 'CVX',  companyName: 'Chevron' },
+    { symbol: 'HD',   companyName: 'Home Depot' },
+    { symbol: 'UNH',  companyName: 'UnitedHealth Group' },
+    { symbol: 'PFE',  companyName: 'Pfizer' },
+    { symbol: 'ABT',  companyName: 'Abbott Laboratories' },
+    { symbol: 'TMO',  companyName: 'Thermo Fisher Scientific' },
+    { symbol: 'NEE',  companyName: 'NextEra Energy' },
+  ],
+};
+
 // ── FMP helpers ──────────────────────────────────────────────────────────────
 
 /**
@@ -76,14 +170,9 @@ function assertFmpArray(data, label) {
   }
 }
 
-async function fetchTickerList(sector, key) {
-  const sectorParam = sector === 'default' ? '' : `&sector=${encodeURIComponent(sector)}`;
-  const url = `${FMP_BASE}/stock-screener?exchange=NYSE,NASDAQ&limit=${TICKER_LIMIT}${sectorParam}&apikey=${key}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Data provider returned HTTP ${res.status} for sector list.`);
-  const data = await res.json();
-  assertFmpArray(data, 'stock-screener');
-  return data;
+function getTickerList(sector) {
+  const list = SECTOR_TICKERS[sector] ?? SECTOR_TICKERS.default;
+  return list;
 }
 
 async function fetchOneTicker(symbol, key) {
@@ -185,17 +274,12 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── 2. Cache miss — fetch fresh from FMP ───────────────────────────────────
-  let tickerList;
-  try {
-    tickerList = await fetchTickerList(sector, key);
-  } catch (err) {
-    return res.status(502).json({ error: err.message });
-  }
+  // ── 2. Resolve ticker list from curated registry ───────────────────────────
+  const tickerList = getTickerList(sector);
 
   if (!tickerList.length) {
     return res.status(404).json({
-      error: `No companies found for sector "${sector}". Try a different sector.`,
+      error: `No companies configured for sector "${sector}". Try a different sector.`,
     });
   }
 
