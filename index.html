@@ -308,7 +308,7 @@
       <div class="mb-6 fade-in">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
-          <span id="heading-ticker" class="hidden font-mono text-lg text-slate-400"></span>
+          <span id="heading-context" class="hidden font-mono text-lg text-slate-400"></span>
         </div>
         <p class="mt-1.5 text-sm text-slate-500 max-w-xl">
           Apply mathematical threshold criteria to publicly available financial data.
@@ -317,78 +317,172 @@
         <p id="heading-date" class="hidden mt-1 text-xs text-slate-600 font-mono"></p>
       </div>
 
-      <!-- Ticker input row -->
-      <div class="mb-8 fade-in">
-        <div class="flex items-center gap-3 max-w-sm">
-          <div class="relative flex-1">
-            <input
-              id="ticker-input"
-              type="text"
-              maxlength="5"
-              placeholder="Ticker symbol (e.g. AAPL)"
-              autocomplete="off"
-              autocorrect="off"
-              spellcheck="false"
-              onkeydown="if(event.key==='Enter') runScreener()"
-              oninput="this.value=this.value.toUpperCase()"
-              class="w-full bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
-                     text-sm font-mono text-slate-200 placeholder-slate-600
-                     focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
-                     transition-colors"
-            />
-          </div>
+      <!-- Tab bar -->
+      <div class="mb-8 fade-in border-b border-slate-800">
+        <div class="flex">
           <button
-            id="run-btn"
-            onclick="runScreener()"
-            class="flex-shrink-0 px-5 py-2.5 rounded-lg text-sm font-semibold
-                   bg-slate-700 text-slate-200 border border-slate-600
-                   hover:bg-slate-600 hover:border-slate-500
-                   disabled:opacity-50 disabled:cursor-not-allowed
-                   transition-all duration-150"
-          >
-            Run Filters
-          </button>
-        </div>
-        <p id="ticker-error" class="hidden mt-2 text-xs text-slate-500"></p>
-      </div>
-
-      <!-- Dynamic filter cards — populated by renderDashboard() -->
-      <div
-        id="filter-cards-container"
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fade-in"
-      >
-        <!-- Empty state: shown before the first Run Filters call -->
-        <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
-          <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
-            <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-.293.707L13 10.414V15a1 1 0 01-.553.894l-4 2A1 1 0 017 17v-6.586L3.293 6.707A1 1 0 013 6V4z" clip-rule="evenodd"/>
-            </svg>
-          </div>
-          <p class="text-sm text-slate-500">Enter a ticker symbol above and click <span class="font-semibold text-slate-400">Run Filters</span> to screen against live data.</p>
-          <p class="mt-1 text-xs text-slate-600">Outputs are arithmetic comparisons only. Not financial advice.</p>
+            id="tab-ticker"
+            onclick="switchTab('ticker')"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
+                   text-slate-300 border-slate-400"
+          >Single Ticker</button>
+          <button
+            id="tab-sector"
+            onclick="switchTab('sector')"
+            class="px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
+                   text-slate-500 border-transparent hover:text-slate-400"
+          >Sector Scan</button>
         </div>
       </div>
 
-      <!-- Overall completion rate summary — hidden until renderDashboard() populates it -->
-      <div id="completion-summary" class="hidden mt-6 bg-brand-800 border border-slate-700/60 rounded-xl p-5 fade-in">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">Overall Completion Rate</p>
-            <p class="text-sm text-slate-400">
-              Mathematical ratio of satisfied criteria to total criteria evaluated across all active filters.
-              This value is an arithmetic representation only and does not constitute a rating or recommendation.
-            </p>
+      <!-- ── PANEL: Single Ticker ───────────────────────────────────────────── -->
+      <div id="panel-ticker">
+
+        <div class="mb-8">
+          <div class="flex items-center gap-3 max-w-sm">
+            <div class="relative flex-1">
+              <input
+                id="ticker-input"
+                type="text"
+                maxlength="5"
+                placeholder="Ticker symbol (e.g. AAPL)"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                onkeydown="if(event.key==='Enter') runScreener()"
+                oninput="this.value=this.value.toUpperCase()"
+                class="w-full bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                       text-sm font-mono text-slate-200 placeholder-slate-600
+                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                       transition-colors"
+              />
+            </div>
+            <button
+              id="run-btn"
+              onclick="runScreener()"
+              class="flex-shrink-0 px-5 py-2.5 rounded-lg text-sm font-semibold
+                     bg-slate-700 text-slate-200 border border-slate-600
+                     hover:bg-slate-600 hover:border-slate-500
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     transition-all duration-150"
+            >Run Filters</button>
           </div>
-          <div class="flex-shrink-0 text-right">
-            <p id="summary-fraction" class="text-3xl font-mono font-semibold text-slate-200"></p>
-            <p id="summary-pct" class="text-xs text-slate-500 mt-0.5 font-mono"></p>
+          <p id="ticker-error" class="hidden mt-2 text-xs text-slate-500"></p>
+        </div>
+
+        <!-- Dynamic filter cards — populated by renderDashboard() -->
+        <div id="filter-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
+              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-.293.707L13 10.414V15a1 1 0 01-.553.894l-4 2A1 1 0 017 17v-6.586L3.293 6.707A1 1 0 013 6V4z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <p class="text-sm text-slate-500">Enter a ticker symbol above and click <span class="font-semibold text-slate-400">Run Filters</span> to screen against live data.</p>
+            <p class="mt-1 text-xs text-slate-600">Outputs are arithmetic comparisons only. Not financial advice.</p>
           </div>
         </div>
-        <!-- Progress bar (neutral) -->
-        <div class="mt-4 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-          <div id="summary-bar" class="h-full bg-slate-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
+
+        <!-- Completion rate summary — hidden until renderDashboard() populates it -->
+        <div id="completion-summary" class="hidden mt-6 bg-brand-800 border border-slate-700/60 rounded-xl p-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">Overall Completion Rate</p>
+              <p class="text-sm text-slate-400">
+                Mathematical ratio of satisfied criteria to total criteria evaluated across all active filters.
+                This value is an arithmetic representation only and does not constitute a rating or recommendation.
+              </p>
+            </div>
+            <div class="flex-shrink-0 text-right">
+              <p id="summary-fraction" class="text-3xl font-mono font-semibold text-slate-200"></p>
+              <p id="summary-pct" class="text-xs text-slate-500 mt-0.5 font-mono"></p>
+            </div>
+          </div>
+          <div class="mt-4 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+            <div id="summary-bar" class="h-full bg-slate-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
+          </div>
         </div>
-      </div>
+
+      </div><!-- /panel-ticker -->
+
+      <!-- ── PANEL: Sector Scan ────────────────────────────────────────────── -->
+      <div id="panel-sector" class="hidden">
+
+        <!-- Sector controls -->
+        <div class="mb-8">
+          <div class="flex flex-wrap items-end gap-3">
+
+            <!-- Sector dropdown -->
+            <div class="flex flex-col gap-1.5">
+              <label for="sector-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Sector</label>
+              <select
+                id="sector-select"
+                class="bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                       text-sm text-slate-200 font-medium
+                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                       transition-colors cursor-pointer"
+              >
+                <option value="Real Estate">Real Estate</option>
+                <option value="Retail">Retail</option>
+                <option value="Technology">Technology</option>
+                <option value="Utilities">Utilities</option>
+                <option value="default">General (Default Thresholds)</option>
+              </select>
+            </div>
+
+            <!-- Sort-by dropdown -->
+            <div class="flex flex-col gap-1.5">
+              <label for="sort-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Sort By</label>
+              <select
+                id="sort-select"
+                class="bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                       text-sm text-slate-200 font-medium
+                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                       transition-colors cursor-pointer"
+              >
+                <option value="price_to_earnings">Price-to-Earnings</option>
+                <option value="price_to_book">Price-to-Book</option>
+                <option value="current_ratio">Current Ratio</option>
+                <option value="interest_coverage">Interest Coverage</option>
+                <option value="ltd_to_nwc">LTD to Net Working Cap</option>
+              </select>
+            </div>
+
+            <!-- Scan button -->
+            <button
+              id="scan-btn"
+              onclick="runSectorScan()"
+              class="px-5 py-2.5 rounded-lg text-sm font-semibold
+                     bg-slate-700 text-slate-200 border border-slate-600
+                     hover:bg-slate-600 hover:border-slate-500
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     transition-all duration-150"
+            >Scan Sector</button>
+
+          </div>
+          <p id="sector-error" class="hidden mt-2 text-xs text-slate-500"></p>
+        </div>
+
+        <!-- Sector threshold reference — shown after scan -->
+        <div id="sector-thresholds" class="hidden mb-5 bg-brand-800 border border-slate-700/60 rounded-xl px-5 py-3">
+          <p class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Active Thresholds for <span id="sector-threshold-name" class="text-slate-400"></span></p>
+          <div id="sector-threshold-list" class="flex flex-wrap gap-x-6 gap-y-1 text-xs font-mono text-slate-400"></div>
+        </div>
+
+        <!-- Sector results table — populated by renderSectorTable() -->
+        <div id="sector-table-container">
+          <div class="flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
+              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <p class="text-sm text-slate-500">Select a sector and click <span class="font-semibold text-slate-400">Scan Sector</span> to rank companies by live data.</p>
+            <p class="mt-1 text-xs text-slate-600">Rank is an arithmetic sort position only. Not financial advice.</p>
+          </div>
+        </div>
+
+      </div><!-- /panel-sector -->
 
     </main>
 
@@ -408,62 +502,47 @@
        ===================================================================== -->
   <script>
     /**
-     * FILTER_CONFIG — Single source of truth for all quantitative screening criteria.
-     *
-     * Each entry defines one measurable threshold used by the Calculation Layer.
-     * The UI Renderer must only consume `observedValue`, `threshold`, `operator`,
-     * and `passed` — never derive or infer additional meaning from these values.
+     * FIELD_REGISTRY — Stable field definitions (no thresholds).
+     * Thresholds are sector-specific and live in SECTOR_CONFIG below.
      *
      * Fields:
-     *   id         {string}  — Stable machine identifier for this criterion.
-     *   label      {string}  — Human-readable display name (no advice language).
-     *   filter     {string}  — Parent filter group this criterion belongs to.
-     *   operator   {string}  — Comparison operator: ">=" | "<=" | ">" | "<" | "===".
-     *   threshold  {number}  — The numeric boundary value for the comparison.
-     *   unit       {string}  — Display unit suffix (e.g. "x", "%", "$", "").
+     *   id        — machine identifier (matches API observedValues keys)
+     *   label     — display name (no advice language)
+     *   filter    — parent filter group for single-ticker card view
+     *   operator  — default comparison operator
+     *   unit      — display suffix
+     *   rankDir   — 'asc' (lower is more conservative) | 'desc' (higher is more conservative)
      */
-    const FILTER_CONFIG = [
-      {
-        id:        'current_ratio',
-        label:     'Current Ratio',
-        filter:    'Liquidity Stress Test',
-        operator:  '>=',
-        threshold: 2.0,
-        unit:      'x',
-      },
-      {
-        id:        'ltd_to_nwc',
-        label:     'LTD to Net Working Capital',
-        filter:    'Capital Structure Filter',
-        operator:  '<=',
-        threshold: 1.0,
-        unit:      'x',
-      },
-      {
-        id:        'interest_coverage',
-        label:     'Interest Coverage',
-        filter:    'Capital Structure Filter',
-        operator:  '>=',
-        threshold: 5.0,
-        unit:      'x',
-      },
-      {
-        id:        'price_to_book',
-        label:     'Price-to-Book',
-        filter:    'Valuation Ratio Filter',
-        operator:  '<=',
-        threshold: 1.5,
-        unit:      'x',
-      },
-      {
-        id:        'price_to_earnings',
-        label:     'Price-to-Earnings',
-        filter:    'Valuation Ratio Filter',
-        operator:  '<=',
-        threshold: 15.0,
-        unit:      'x',
-      },
+    const FIELD_REGISTRY = [
+      { id: 'current_ratio',     label: 'Current Ratio',          filter: 'Liquidity Stress Test',   operator: '>=', unit: 'x', rankDir: 'desc' },
+      { id: 'ltd_to_nwc',        label: 'LTD to Net Working Cap', filter: 'Capital Structure Filter', operator: '<=', unit: 'x', rankDir: 'asc'  },
+      { id: 'interest_coverage', label: 'Interest Coverage',      filter: 'Capital Structure Filter', operator: '>=', unit: 'x', rankDir: 'desc' },
+      { id: 'price_to_book',     label: 'Price-to-Book',          filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x', rankDir: 'asc'  },
+      { id: 'price_to_earnings', label: 'Price-to-Earnings',      filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x', rankDir: 'asc'  },
     ];
+
+    /**
+     * SECTOR_CONFIG — Per-sector threshold overrides.
+     * Each key maps to an object of { fieldId: thresholdNumber }.
+     * Operators and field definitions are inherited from FIELD_REGISTRY.
+     * 'default' is used when no sector-specific config exists.
+     */
+    const SECTOR_CONFIG = {
+      default:        { current_ratio: 2.0, ltd_to_nwc: 1.0, interest_coverage: 5.0,  price_to_book: 1.5, price_to_earnings: 15.0 },
+      'Real Estate':  { current_ratio: 1.2, ltd_to_nwc: 5.0, interest_coverage: 2.0,  price_to_book: 2.5, price_to_earnings: 25.0 },
+      'Retail':       { current_ratio: 1.5, ltd_to_nwc: 2.0, interest_coverage: 3.0,  price_to_book: 3.0, price_to_earnings: 20.0 },
+      'Technology':   { current_ratio: 1.5, ltd_to_nwc: 1.5, interest_coverage: 10.0, price_to_book: 5.0, price_to_earnings: 30.0 },
+      'Utilities':    { current_ratio: 1.0, ltd_to_nwc: 3.0, interest_coverage: 2.5,  price_to_book: 2.0, price_to_earnings: 20.0 },
+    };
+
+    /**
+     * Merges FIELD_REGISTRY with the appropriate SECTOR_CONFIG thresholds.
+     * Returns a complete criterion array ready for the Calculation Layer.
+     */
+    function getActiveConfig(sector) {
+      const thresholds = SECTOR_CONFIG[sector] ?? SECTOR_CONFIG.default;
+      return FIELD_REGISTRY.map(f => ({ ...f, threshold: thresholds[f.id] }));
+    }
 
     // ── DATA LAYER ──────────────────────────────────────────────────────────────
     /**
@@ -495,8 +574,13 @@
       }
     }
 
-    function runCalculationLayer(observedValues) {
-      return FILTER_CONFIG.map(criterion => ({
+    /**
+     * Pure Calculation Layer. Accepts an explicit config (from getActiveConfig)
+     * so sector-specific thresholds flow in without any DOM or side-effect access.
+     */
+    function runCalculationLayer(observedValues, config) {
+      const activeConfig = config ?? getActiveConfig('default');
+      return activeConfig.map(criterion => ({
         ...criterion,
         observedValue: observedValues[criterion.id] ?? null,
         passed:        evaluate(
@@ -523,8 +607,7 @@
     }
 
     function renderDashboard(results, ticker, fiscalDate) {
-      // Update heading ticker badge
-      const tickerEl = document.getElementById('heading-ticker');
+      const tickerEl = document.getElementById('heading-context');
       tickerEl.textContent = `— ${ticker}`;
       tickerEl.classList.remove('hidden');
 
@@ -612,7 +695,7 @@
       runBtn.disabled      = true;
       runBtn.textContent   = 'Fetching…';
       document.getElementById('completion-summary').classList.add('hidden');
-      document.getElementById('heading-ticker').classList.add('hidden');
+      document.getElementById('heading-context').classList.add('hidden');
       document.getElementById('heading-date').classList.add('hidden');
 
       container.innerHTML = `
@@ -626,7 +709,7 @@
 
       try {
         const data    = await fetchRatios(ticker);
-        const results = runCalculationLayer(data.observedValues);
+        const results = runCalculationLayer(data.observedValues, getActiveConfig('default'));
         renderDashboard(results, ticker, data.fiscalDateEnding);
       } catch (err) {
         container.innerHTML = `
@@ -636,6 +719,213 @@
       } finally {
         runBtn.disabled    = false;
         runBtn.textContent = 'Run Filters';
+      }
+    }
+
+    // ── TAB SWITCHER ─────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      const isTickerTab = tab === 'ticker';
+
+      document.getElementById('panel-ticker').classList.toggle('hidden', !isTickerTab);
+      document.getElementById('panel-sector').classList.toggle('hidden',  isTickerTab);
+
+      function setTabActive(btn, active) {
+        if (active) {
+          btn.classList.remove('text-slate-500', 'border-transparent');
+          btn.classList.add('text-slate-300', 'border-slate-400');
+        } else {
+          btn.classList.remove('text-slate-300', 'border-slate-400');
+          btn.classList.add('text-slate-500', 'border-transparent');
+        }
+      }
+
+      setTabActive(document.getElementById('tab-ticker'), isTickerTab);
+      setTabActive(document.getElementById('tab-sector'), !isTickerTab);
+
+      // Reset heading context on tab switch
+      const ctxEl = document.getElementById('heading-context');
+      ctxEl.classList.add('hidden');
+      ctxEl.textContent = '';
+      document.getElementById('heading-date').classList.add('hidden');
+    }
+
+    // ── SECTOR DATA LAYER ────────────────────────────────────────────────────────
+    /**
+     * Calls /api/sector. Returns { sector, cachedAt, companies[] } or throws.
+     * Each company: { symbol, companyName, observedValues }
+     */
+    async function fetchSector(sector) {
+      const res  = await fetch(`/api/sector?sector=${encodeURIComponent(sector)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to retrieve sector data. Please try again.');
+      return data;
+    }
+
+    // ── RANKING ENGINE (pure — no DOM access) ────────────────────────────────────
+    /**
+     * Sorts companies by one ratio field using the field's natural rankDir.
+     * Null values are always sorted last regardless of direction.
+     * Returns a new array with a `rank` integer appended to each company.
+     */
+    function rankCompanies(companies, sortById) {
+      const field = FIELD_REGISTRY.find(f => f.id === sortById);
+      const dir   = field?.rankDir ?? 'asc';
+      return [...companies]
+        .sort((a, b) => {
+          const va = a.observedValues[sortById];
+          const vb = b.observedValues[sortById];
+          if (va === null && vb === null) return 0;
+          if (va === null) return 1;
+          if (vb === null) return -1;
+          return dir === 'asc' ? va - vb : vb - va;
+        })
+        .map((c, i) => ({ ...c, rank: i + 1 }));
+    }
+
+    // ── SECTOR PRESENTATION LAYER ────────────────────────────────────────────────
+    // Module-level store for re-sorting without re-fetching.
+    let _sectorCompanies = null;
+    let _sectorName      = null;
+
+    /**
+     * Renders the sector results table.
+     * Consumes only: rank, companyName, symbol, observedValues, passed (per criterion).
+     * Never calculates. Receives a pre-ranked, pre-calculated array.
+     */
+    function renderSectorTable(rankedCompanies, activeSortId, activeConfig) {
+      const container = document.getElementById('sector-table-container');
+
+      if (!rankedCompanies.length) {
+        container.innerHTML = `<p class="text-sm text-slate-500 py-10 text-center">No companies returned for this sector.</p>`;
+        return;
+      }
+
+      // Build column header cells
+      const colHeaders = FIELD_REGISTRY.map(f => {
+        const isActive = f.id === activeSortId;
+        return `<th scope="col"
+                    onclick="resortTable('${f.id}')"
+                    class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-widest cursor-pointer select-none transition-colors
+                           ${isActive ? 'text-slate-300' : 'text-slate-600 hover:text-slate-400'}">
+                  ${f.label}${isActive ? ' ↕' : ''}
+                </th>`;
+      }).join('');
+
+      // Build data rows
+      const rows = rankedCompanies.map(company => {
+        const calcResults = runCalculationLayer(company.observedValues, activeConfig);
+        const metCount    = calcResults.filter(r => r.passed === true).length;
+        const total       = calcResults.length;
+
+        const cells = FIELD_REGISTRY.map(f => {
+          const result  = calcResults.find(r => r.id === f.id);
+          const valStr  = formatValue(company.observedValues[f.id], f.unit);
+          const isActive = f.id === activeSortId;
+          return `<td class="px-3 py-3 text-sm font-mono whitespace-nowrap
+                             ${isActive ? 'text-slate-200' : 'text-slate-400'}">
+                    ${valStr}
+                  </td>`;
+        }).join('');
+
+        return `
+          <tr class="border-t border-slate-800 hover:bg-slate-800/40 transition-colors">
+            <td class="px-3 py-3 text-sm font-mono text-slate-500 text-center">${company.rank}</td>
+            <td class="px-3 py-3 text-sm text-slate-300 max-w-[180px] truncate">${company.companyName}</td>
+            <td class="px-3 py-3 text-sm font-mono font-semibold text-slate-200">${company.symbol}</td>
+            ${cells}
+            <td class="px-3 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap">${metCount} / ${total}</td>
+          </tr>`;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="overflow-x-auto rounded-xl border border-slate-700/60">
+          <table class="w-full border-collapse text-left bg-brand-800">
+            <thead class="bg-brand-900/60">
+              <tr>
+                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center">Rank</th>
+                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Company</th>
+                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600">Ticker</th>
+                ${colHeaders}
+                <th scope="col" class="px-3 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center">Criteria Met</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <p class="mt-3 text-xs text-slate-700 text-right">
+          Rank is an arithmetic sort position only. Not financial advice.
+        </p>`;
+    }
+
+    /**
+     * Re-sorts the cached sector companies by a new field without re-fetching.
+     * Called when a column header is clicked.
+     */
+    function resortTable(fieldId) {
+      if (!_sectorCompanies) return;
+      document.getElementById('sort-select').value = fieldId;
+      const activeConfig = getActiveConfig(_sectorName ?? 'default');
+      const ranked       = rankCompanies(_sectorCompanies, fieldId);
+      renderSectorTable(ranked, fieldId, activeConfig);
+    }
+
+    // ── SECTOR ORCHESTRATOR ──────────────────────────────────────────────────────
+    async function runSectorScan() {
+      const sector    = document.getElementById('sector-select').value;
+      const sortBy    = document.getElementById('sort-select').value;
+      const scanBtn   = document.getElementById('scan-btn');
+      const errorEl   = document.getElementById('sector-error');
+      const container = document.getElementById('sector-table-container');
+
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+
+      scanBtn.disabled    = true;
+      scanBtn.textContent = 'Scanning…';
+
+      const sectorLabel = sector === 'default' ? 'General' : sector;
+      document.getElementById('heading-context').textContent = `— ${sectorLabel}`;
+      document.getElementById('heading-context').classList.remove('hidden');
+      document.getElementById('heading-date').classList.add('hidden');
+
+      // Show threshold reference panel
+      const activeConfig = getActiveConfig(sector);
+      document.getElementById('sector-threshold-name').textContent = sectorLabel;
+      document.getElementById('sector-threshold-list').innerHTML = activeConfig.map(f =>
+        `<span>${f.label}: <span class="text-slate-500">${f.operator} ${f.threshold}${f.unit}</span></span>`
+      ).join('');
+      document.getElementById('sector-thresholds').classList.remove('hidden');
+
+      container.innerHTML = `
+        <div class="flex items-center justify-center py-20 text-slate-500 text-sm">
+          <svg class="animate-spin w-4 h-4 mr-2.5 text-slate-500" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          Scanning <span class="font-mono ml-1 text-slate-400">${sectorLabel}</span>…
+        </div>`;
+
+      try {
+        const data         = await fetchSector(sector);
+        _sectorCompanies   = data.companies;
+        _sectorName        = sector;
+
+        if (data.cachedAt) {
+          document.getElementById('heading-date').textContent = `Cached ${data.cachedAt}`;
+          document.getElementById('heading-date').classList.remove('hidden');
+        }
+
+        const ranked = rankCompanies(_sectorCompanies, sortBy);
+        renderSectorTable(ranked, sortBy, activeConfig);
+      } catch (err) {
+        _sectorCompanies = null;
+        container.innerHTML = `
+          <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-6 text-center">
+            <p class="text-sm text-slate-500">${err.message || 'An unexpected error occurred. Please try again.'}</p>
+          </div>`;
+      } finally {
+        scanBtn.disabled    = false;
+        scanBtn.textContent = 'Scan Sector';
       }
     }
 
