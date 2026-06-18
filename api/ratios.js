@@ -56,6 +56,89 @@ function computeInterestCoverage(fd) {
 }
 
 /**
+ * Cash ROIC (Return on Invested Capital) — Mauboussin cash-earnings approach.
+ *
+ * Formula:
+ *   Cash NOPAT    = EBITDA × (1 − 0.21)           [EBITDA ≈ cash operating earnings]
+ *   Stockholders' Equity derived from D/E ratio:   equity = totalDebt / (debtToEquity/100)
+ *   Fallback (zero-debt companies):                equity = netIncome / returnOnEquity
+ *   Invested Capital = equity + totalDebt − totalCash
+ *   ROIC             = Cash NOPAT / Invested Capital
+ *
+ * Using EBITDA (not operating income) as the numerator so depreciation on real assets
+ * does not artificially depress results for capital-intensive sectors (REITs, utilities).
+ * This aligns with Mauboussin's "cash earnings" definition in his Capital Allocation paper.
+ *
+ * Assumptions: US corporate tax = 21%. Returns null when inputs are insufficient.
+ */
+function computeROIC(fd) {
+  const ebitda = fd.ebitda       ?? null;
+  const td     = fd.totalDebt    ?? 0;
+  const de     = fd.debtToEquity ?? null;   // Yahoo Finance % format: 100 = 1.0×
+  const cash   = fd.totalCash    ?? 0;
+
+  if (ebitda === null) return null;
+
+  // Derive stockholders' equity
+  let equity = null;
+  if (de !== null && de > 0 && td > 0) {
+    equity = td / (de / 100);              // standard: D/E known and positive
+  } else if (td === 0) {
+    // Zero-debt: back out equity via ROE = netIncome / equity
+    const roe = fd.returnOnEquity ?? null;
+    const pm  = fd.profitMargins  ?? null;
+    const rev = fd.totalRevenue   ?? null;
+    if (roe && roe !== 0 && pm !== null && rev !== null) {
+      equity = (pm * rev) / roe;
+    }
+  }
+
+  if (equity === null || equity <= 0) return null;
+
+  const investedCapital = equity + td - cash;
+  if (investedCapital <= 0) return null;   // net-cash company or bad data
+
+  return (ebitda * (1 - 0.21)) / investedCapital;  // as decimal: 0.18 = 18% ROIC
+}
+
+/**
+ * Approximate WACC via CAPM + after-tax cost of debt.
+ *
+ * Cost of equity  Ke = rf + β × MRP   (CAPM)
+ * Cost of debt    Kd = 5% pre-tax  →  3.95% after-tax at 21% corporate rate
+ * WACC            = (E/V) × Ke + (D/V) × Kd_after_tax
+ *
+ * Constants (June 2026):
+ *   rf  = 4.5%   (10-year US Treasury)
+ *   MRP = 5.5%   (long-run equity risk premium)
+ *   Kd  = 5.0%   (assumed investment-grade borrowing rate)
+ *   t   = 21%    (US corporate tax)
+ *
+ * Beta defaults to 1.0 (market beta) when unavailable or negative.
+ * For zero-debt companies WACC = Ke.
+ */
+function computeWACC(fd, ks) {
+  const RF  = 0.045;
+  const MRP = 0.055;
+  const KD  = 0.05;
+  const TAX = 0.21;
+
+  const rawBeta = ks.beta ?? null;
+  const beta    = (rawBeta !== null && rawBeta > 0) ? rawBeta : 1.0;
+  const ke      = RF + beta * MRP;
+
+  const td = fd.totalDebt    ?? 0;
+  const de = fd.debtToEquity ?? null;
+
+  if (td === 0 || de === null || de <= 0) return ke;  // all-equity financing
+
+  const equity       = td / (de / 100);
+  const totalCapital = equity + td;
+
+  return (equity / totalCapital) * ke + (td / totalCapital) * KD * (1 - TAX);
+}
+
+/**
  * Robust P/E extraction.
  * Prefers trailing P/E; negative P/E (loss-making companies) is treated as
  * unusable data and falls back to forward P/E. Returns null if both are absent.
@@ -115,7 +198,10 @@ export default async function handler(req, res) {
       revenue_growth:    fd.revenueGrowth  ?? null,  // 0.18 = 18% TTM growth
       return_on_equity:  fd.returnOnEquity ?? null,  // 0.34 = 34% TTM ROE
       payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
-      interest_coverage: computeInterestCoverage(fd), // proxy: op.income / (totalDebt × 5%)
+      interest_coverage: computeInterestCoverage(fd), // proxy: ebitda / (totalDebt × 5%)
+      // Capital allocation efficiency (Mauboussin framework)
+      roic:              computeROIC(fd),             // cash NOPAT / invested capital (decimal)
+      wacc:              computeWACC(fd, ks),         // CAPM + after-tax cost of debt (decimal)
     },
   });
 }

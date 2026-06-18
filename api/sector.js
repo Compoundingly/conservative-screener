@@ -70,6 +70,79 @@ function computeInterestCoverage(fd) {
   return ebitda / (totalDebt * 0.05); // EBITDA / implied annual interest at 5%
 }
 
+/**
+ * Cash ROIC (Return on Invested Capital) — Mauboussin cash-earnings approach.
+ *
+ * Formula:
+ *   Cash NOPAT    = EBITDA × (1 − 0.21)           [EBITDA ≈ cash operating earnings]
+ *   Stockholders' Equity derived from D/E ratio:   equity = totalDebt / (debtToEquity/100)
+ *   Fallback (zero-debt companies):                equity = netIncome / returnOnEquity
+ *   Invested Capital = equity + totalDebt − totalCash
+ *   ROIC             = Cash NOPAT / Invested Capital
+ *
+ * Using EBITDA so depreciation on real assets does not distort results for
+ * capital-intensive sectors. Aligns with Mauboussin's "cash earnings" definition.
+ * Assumptions: US corporate tax = 21%. Returns null when inputs are insufficient.
+ */
+function computeROIC(fd) {
+  const ebitda = fd.ebitda       ?? null;
+  const td     = fd.totalDebt    ?? 0;
+  const de     = fd.debtToEquity ?? null;   // Yahoo Finance % format: 100 = 1.0×
+  const cash   = fd.totalCash    ?? 0;
+
+  if (ebitda === null) return null;
+
+  // Derive stockholders' equity
+  let equity = null;
+  if (de !== null && de > 0 && td > 0) {
+    equity = td / (de / 100);
+  } else if (td === 0) {
+    const roe = fd.returnOnEquity ?? null;
+    const pm  = fd.profitMargins  ?? null;
+    const rev = fd.totalRevenue   ?? null;
+    if (roe && roe !== 0 && pm !== null && rev !== null) {
+      equity = (pm * rev) / roe;
+    }
+  }
+
+  if (equity === null || equity <= 0) return null;
+
+  const investedCapital = equity + td - cash;
+  if (investedCapital <= 0) return null;
+
+  return (ebitda * (1 - 0.21)) / investedCapital;  // decimal: 0.18 = 18%
+}
+
+/**
+ * Approximate WACC via CAPM + after-tax cost of debt.
+ *
+ * Ke = rf + β × MRP  (CAPM);  Kd_after_tax = 5% × (1 − 0.21) = 3.95%
+ * WACC = (E/V) × Ke + (D/V) × Kd_after_tax
+ *
+ * Constants (June 2026): rf = 4.5%, MRP = 5.5%, Kd = 5.0%, t = 21%.
+ * Beta defaults to 1.0 when unavailable. For zero-debt companies WACC = Ke.
+ */
+function computeWACC(fd, ks) {
+  const RF  = 0.045;
+  const MRP = 0.055;
+  const KD  = 0.05;
+  const TAX = 0.21;
+
+  const rawBeta = ks.beta ?? null;
+  const beta    = (rawBeta !== null && rawBeta > 0) ? rawBeta : 1.0;
+  const ke      = RF + beta * MRP;
+
+  const td = fd.totalDebt    ?? 0;
+  const de = fd.debtToEquity ?? null;
+
+  if (td === 0 || de === null || de <= 0) return ke;
+
+  const equity       = td / (de / 100);
+  const totalCapital = equity + td;
+
+  return (equity / totalCapital) * ke + (td / totalCapital) * KD * (1 - TAX);
+}
+
 // ── Sector ticker registry ───────────────────────────────────────────────────
 // All symbols verified as active on Yahoo Finance (June 2026).
 // Delisted / acquired tickers excluded: JNPR (→HPE), ANSS (→SNPS), K/Kellanova
@@ -486,6 +559,9 @@ async function fetchOneTicker(symbol) {
     return_on_equity:  fd.returnOnEquity ?? null,  // 0.34 = 34% TTM ROE
     payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
     interest_coverage: computeInterestCoverage(fd), // proxy: ebitda / (totalDebt × 5%)
+    // Capital allocation efficiency (Mauboussin framework)
+    roic:              computeROIC(fd),             // cash NOPAT / invested capital (decimal)
+    wacc:              computeWACC(fd, ks),         // CAPM + after-tax cost of debt (decimal)
   };
 }
 

@@ -1033,6 +1033,29 @@
           srCls  = 'text-slate-700';
         }
 
+        // Capital Efficiency cell — ROIC vs WACC (Mauboussin framework)
+        // Color: sky = ROIC exceeds WACC (value creation)
+        //        slate-500 = ROIC below WACC (value dilution)
+        //        slate-700 = insufficient data
+        const roic    = company.observedValues.roic ?? null;
+        const wacc    = company.observedValues.wacc ?? null;
+        const roicAct = 'roic' === sortState.id;
+        let roicText, roicCls;
+        if (roic === null || wacc === null) {
+          roicText = '—';
+          roicCls  = 'text-slate-700';
+        } else {
+          const roicPct  = (roic * 100).toFixed(1);
+          const spread   = roic - wacc;
+          const spreadPct = (Math.abs(spread) * 100).toFixed(1);
+          const sign     = spread >= 0 ? '+' : '−';
+          roicText = `${roicPct}% <span class="text-xs opacity-60">(${sign}${spreadPct}pp)</span>`;
+          const aboveWacc = spread >= 0;
+          roicCls  = aboveWacc
+            ? (roicAct ? 'text-sky-200'   : 'text-sky-300')
+            : (roicAct ? 'text-slate-300' : 'text-slate-500');
+        }
+
         // Ticker cell uses font-sans so letter O is unambiguous from digit 0
         return `
           <tr class="border-t border-slate-800/80 hover:bg-slate-800/30 transition-colors">
@@ -1044,6 +1067,7 @@
             ${cells}
             <td class="px-4 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-slate-200' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
             <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${srCls}">${srText}</td>
+            <td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${roicCls}">${roicText}</td>
           </tr>`;
       }).join('');
 
@@ -1058,13 +1082,14 @@
                 ${colHeaders}
                 <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-center')}">Criteria Met${arrow('criteria_met')}</th>
                 <th scope="col" onclick="resortTable('structural_risk')" class="${thCls('structural_risk', 'text-center')}">Structural Risk${arrow('structural_risk')}</th>
+                <th scope="col" onclick="resortTable('roic')" class="${thCls('roic', 'text-right')}">ROIC <span class="font-normal opacity-50 normal-case tracking-normal">(vs WACC)</span>${arrow('roic')}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
         <p class="mt-3 text-xs text-slate-700 text-right">
-          Rank is an arithmetic sort position only. Not financial advice.
+          Rank is an arithmetic sort position only. ROIC is an approximation (EBITDA-based cash NOPAT; WACC via CAPM). Not financial advice.
         </p>`;
     }
 
@@ -1080,10 +1105,11 @@
       } else {
         _sortState.id  = colId;
         const field    = FIELD_REGISTRY.find(f => f.id === colId);
-        _sortState.dir = colId === 'criteria_met' ? 'desc'
+        _sortState.dir = colId === 'criteria_met'    ? 'desc'
                        : colId === 'structural_risk' ? 'desc'
-                       : colId === 'companyName'  ? 'asc'
-                       : colId === 'symbol'       ? 'asc'
+                       : colId === 'roic'            ? 'desc'   // higher ROIC = better
+                       : colId === 'companyName'     ? 'asc'
+                       : colId === 'symbol'          ? 'asc'
                        : (field?.rankDir ?? 'asc');
       }
 
