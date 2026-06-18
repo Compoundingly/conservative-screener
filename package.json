@@ -1,0 +1,12 @@
+{
+  "name": "conservative-screener",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "devDependencies": {
+    "vercel": "^54.14.2"
+  }
+}
+
