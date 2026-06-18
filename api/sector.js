@@ -71,8 +71,12 @@ function computeInterestCoverage(fd) {
 }
 
 // ── Sector ticker registry ───────────────────────────────────────────────────
+// All symbols verified as active on Yahoo Finance (June 2026).
+// Delisted / acquired tickers excluded: JNPR (→HPE), ANSS (→SNPS), K/Kellanova
+// (→Mars), WBA (→private), DFS (→COF), MRO/PXD/HES (→COP/XOM), KLG, SJW.
 
 const SECTOR_TICKERS = {
+  // ── Real Estate (REITs) ──────────────────────────────────────────────────
   'Real Estate': [
     { symbol: 'O',    companyName: 'Realty Income' },
     { symbol: 'SPG',  companyName: 'Simon Property Group' },
@@ -83,13 +87,30 @@ const SECTOR_TICKERS = {
     { symbol: 'AVB',  companyName: 'AvalonBay Communities' },
     { symbol: 'EQR',  companyName: 'Equity Residential' },
     { symbol: 'PSA',  companyName: 'Public Storage' },
-    { symbol: 'DLR',  companyName: 'Digital Realty' },
+    { symbol: 'DLR',  companyName: 'Digital Realty Trust' },
     { symbol: 'VTR',  companyName: 'Ventas' },
     { symbol: 'NNN',  companyName: 'NNN REIT' },
     { symbol: 'ARE',  companyName: 'Alexandria Real Estate' },
     { symbol: 'SBAC', companyName: 'SBA Communications' },
     { symbol: 'CBRE', companyName: 'CBRE Group' },
+    { symbol: 'EXR',  companyName: 'Extra Space Storage' },
+    { symbol: 'INVH', companyName: 'Invitation Homes' },
+    { symbol: 'MAA',  companyName: 'Mid-America Apartment' },
+    { symbol: 'UDR',  companyName: 'UDR Inc.' },
+    { symbol: 'KIM',  companyName: 'Kimco Realty' },
+    { symbol: 'REG',  companyName: 'Regency Centers' },
+    { symbol: 'BXP',  companyName: 'Boston Properties' },
+    { symbol: 'HST',  companyName: 'Host Hotels & Resorts' },
+    { symbol: 'IRM',  companyName: 'Iron Mountain' },
+    { symbol: 'GLPI', companyName: 'Gaming & Leisure Properties' },
+    { symbol: 'VICI', companyName: 'VICI Properties' },
+    { symbol: 'WPC',  companyName: 'W. P. Carey' },
+    { symbol: 'STAG', companyName: 'STAG Industrial' },
+    { symbol: 'CPT',  companyName: 'Camden Property Trust' },
+    { symbol: 'LXP',  companyName: 'LXP Industrial Trust' },
   ],
+
+  // ── Consumer Discretionary / Retail ─────────────────────────────────────
   'Retail': [
     { symbol: 'WMT',  companyName: 'Walmart' },
     { symbol: 'TGT',  companyName: 'Target' },
@@ -106,24 +127,58 @@ const SECTOR_TICKERS = {
     { symbol: 'BBY',  companyName: 'Best Buy' },
     { symbol: 'M',    companyName: "Macy's" },
     { symbol: 'GPS',  companyName: 'Gap' },
+    { symbol: 'NKE',  companyName: 'Nike' },
+    { symbol: 'SBUX', companyName: 'Starbucks' },
+    { symbol: 'MCD',  companyName: "McDonald's" },
+    { symbol: 'YUM',  companyName: 'Yum! Brands' },
+    { symbol: 'CMG',  companyName: 'Chipotle Mexican Grill' },
+    { symbol: 'DRI',  companyName: 'Darden Restaurants' },
+    { symbol: 'SYY',  companyName: 'Sysco' },
+    { symbol: 'BJ',   companyName: "BJ's Wholesale" },
+    { symbol: 'ULTA', companyName: 'Ulta Beauty' },
+    { symbol: 'BBWI', companyName: 'Bath & Body Works' },
+    { symbol: 'PVH',  companyName: 'PVH Corp.' },
+    { symbol: 'RL',   companyName: 'Ralph Lauren' },
+    { symbol: 'BURL', companyName: 'Burlington Stores' },
+    { symbol: 'CASY', companyName: "Casey's General Stores" },
+    { symbol: 'SFM',  companyName: 'Sprouts Farmers Market' },
   ],
+
+  // ── Technology (established, profitable) ────────────────────────────────
   'Technology': [
-    { symbol: 'AAPL',  companyName: 'Apple' },
-    { symbol: 'MSFT',  companyName: 'Microsoft' },
-    { symbol: 'ORCL',  companyName: 'Oracle' },
-    { symbol: 'IBM',   companyName: 'IBM' },
-    { symbol: 'CSCO',  companyName: 'Cisco Systems' },
-    { symbol: 'TXN',   companyName: 'Texas Instruments' },
-    { symbol: 'QCOM',  companyName: 'Qualcomm' },
-    { symbol: 'AVGO',  companyName: 'Broadcom' },
-    { symbol: 'ADI',   companyName: 'Analog Devices' },
-    { symbol: 'AMAT',  companyName: 'Applied Materials' },
-    { symbol: 'KLAC',  companyName: 'KLA Corporation' },
-    { symbol: 'MSI',   companyName: 'Motorola Solutions' },
-    { symbol: 'JNPR',  companyName: 'Juniper Networks' },
-    { symbol: 'HPQ',   companyName: 'HP Inc.' },
-    { symbol: 'NTAP',  companyName: 'NetApp' },
+    { symbol: 'AAPL', companyName: 'Apple' },
+    { symbol: 'MSFT', companyName: 'Microsoft' },
+    { symbol: 'ORCL', companyName: 'Oracle' },
+    { symbol: 'IBM',  companyName: 'IBM' },
+    { symbol: 'CSCO', companyName: 'Cisco Systems' },
+    { symbol: 'TXN',  companyName: 'Texas Instruments' },
+    { symbol: 'QCOM', companyName: 'Qualcomm' },
+    { symbol: 'AVGO', companyName: 'Broadcom' },
+    { symbol: 'ADI',  companyName: 'Analog Devices' },
+    { symbol: 'AMAT', companyName: 'Applied Materials' },
+    { symbol: 'KLAC', companyName: 'KLA Corporation' },
+    { symbol: 'MSI',  companyName: 'Motorola Solutions' },
+    { symbol: 'HPQ',  companyName: 'HP Inc.' },
+    { symbol: 'NTAP', companyName: 'NetApp' },
+    { symbol: 'INTC', companyName: 'Intel' },
+    { symbol: 'MU',   companyName: 'Micron Technology' },
+    { symbol: 'WDC',  companyName: 'Western Digital' },
+    { symbol: 'STX',  companyName: 'Seagate Technology' },
+    { symbol: 'LRCX', companyName: 'Lam Research' },
+    { symbol: 'MCHP', companyName: 'Microchip Technology' },
+    { symbol: 'SWKS', companyName: 'Skyworks Solutions' },
+    { symbol: 'CDNS', companyName: 'Cadence Design Systems' },
+    { symbol: 'SNPS', companyName: 'Synopsys' },
+    { symbol: 'FFIV', companyName: 'F5 Networks' },
+    { symbol: 'KEYS', companyName: 'Keysight Technologies' },
+    { symbol: 'ACN',  companyName: 'Accenture' },
+    { symbol: 'HPE',  companyName: 'Hewlett Packard Enterprise' },
+    { symbol: 'CTSH', companyName: 'Cognizant Technology' },
+    { symbol: 'VRSN', companyName: 'VeriSign' },
+    { symbol: 'EPAM', companyName: 'EPAM Systems' },
   ],
+
+  // ── Utilities ────────────────────────────────────────────────────────────
   'Utilities': [
     { symbol: 'NEE',  companyName: 'NextEra Energy' },
     { symbol: 'DUK',  companyName: 'Duke Energy' },
@@ -140,7 +195,195 @@ const SECTOR_TICKERS = {
     { symbol: 'CNP',  companyName: 'CenterPoint Energy' },
     { symbol: 'PPL',  companyName: 'PPL Corporation' },
     { symbol: 'AES',  companyName: 'AES Corporation' },
+    { symbol: 'EIX',  companyName: 'Edison International' },
+    { symbol: 'D',    companyName: 'Dominion Energy' },
+    { symbol: 'AWK',  companyName: 'American Water Works' },
+    { symbol: 'NI',   companyName: 'NiSource' },
+    { symbol: 'EVRG', companyName: 'Evergy' },
+    { symbol: 'LNT',  companyName: 'Alliant Energy' },
+    { symbol: 'IDA',  companyName: 'IDACORP' },
+    { symbol: 'BKH',  companyName: 'Black Hills Corporation' },
+    { symbol: 'SR',   companyName: 'Spire Inc.' },
+    { symbol: 'OGE',  companyName: 'OGE Energy' },
+    { symbol: 'NWE',  companyName: 'NorthWestern Energy' },
+    { symbol: 'AWR',  companyName: 'American States Water' },
+    { symbol: 'CWT',  companyName: 'California Water Service' },
+    { symbol: 'MSEX', companyName: 'Middlesex Water' },
+    { symbol: 'WTRG', companyName: 'Essential Utilities' },
   ],
+
+  // ── Healthcare ───────────────────────────────────────────────────────────
+  'Healthcare': [
+    { symbol: 'JNJ',  companyName: 'Johnson & Johnson' },
+    { symbol: 'UNH',  companyName: 'UnitedHealth Group' },
+    { symbol: 'PFE',  companyName: 'Pfizer' },
+    { symbol: 'ABT',  companyName: 'Abbott Laboratories' },
+    { symbol: 'TMO',  companyName: 'Thermo Fisher Scientific' },
+    { symbol: 'MRK',  companyName: 'Merck' },
+    { symbol: 'BMY',  companyName: 'Bristol-Myers Squibb' },
+    { symbol: 'ABBV', companyName: 'AbbVie' },
+    { symbol: 'LLY',  companyName: 'Eli Lilly' },
+    { symbol: 'AMGN', companyName: 'Amgen' },
+    { symbol: 'GILD', companyName: 'Gilead Sciences' },
+    { symbol: 'MDT',  companyName: 'Medtronic' },
+    { symbol: 'SYK',  companyName: 'Stryker' },
+    { symbol: 'BSX',  companyName: 'Boston Scientific' },
+    { symbol: 'EW',   companyName: 'Edwards Lifesciences' },
+    { symbol: 'BDX',  companyName: 'Becton Dickinson' },
+    { symbol: 'ZBH',  companyName: 'Zimmer Biomet' },
+    { symbol: 'BAX',  companyName: 'Baxter International' },
+    { symbol: 'CI',   companyName: 'Cigna' },
+    { symbol: 'CVS',  companyName: 'CVS Health' },
+    { symbol: 'HUM',  companyName: 'Humana' },
+    { symbol: 'ELV',  companyName: 'Elevance Health' },
+    { symbol: 'CNC',  companyName: 'Centene' },
+    { symbol: 'HCA',  companyName: 'HCA Healthcare' },
+    { symbol: 'DGX',  companyName: 'Quest Diagnostics' },
+    { symbol: 'LH',   companyName: 'Labcorp' },
+    { symbol: 'VRTX', companyName: 'Vertex Pharmaceuticals' },
+    { symbol: 'HOLX', companyName: 'Hologic' },
+    { symbol: 'MOH',  companyName: 'Molina Healthcare' },
+    { symbol: 'THC',  companyName: 'Tenet Healthcare' },
+  ],
+
+  // ── Consumer Staples ─────────────────────────────────────────────────────
+  'Consumer Staples': [
+    { symbol: 'PG',   companyName: 'Procter & Gamble' },
+    { symbol: 'KO',   companyName: 'Coca-Cola' },
+    { symbol: 'PEP',  companyName: 'PepsiCo' },
+    { symbol: 'MO',   companyName: 'Altria' },
+    { symbol: 'PM',   companyName: 'Philip Morris' },
+    { symbol: 'CL',   companyName: 'Colgate-Palmolive' },
+    { symbol: 'KMB',  companyName: 'Kimberly-Clark' },
+    { symbol: 'GIS',  companyName: 'General Mills' },
+    { symbol: 'HRL',  companyName: 'Hormel Foods' },
+    { symbol: 'SJM',  companyName: 'J.M. Smucker' },
+    { symbol: 'MKC',  companyName: 'McCormick' },
+    { symbol: 'CAG',  companyName: 'ConAgra Brands' },
+    { symbol: 'CPB',  companyName: 'Campbell Soup' },
+    { symbol: 'HSY',  companyName: 'Hershey' },
+    { symbol: 'CHD',  companyName: 'Church & Dwight' },
+    { symbol: 'CLX',  companyName: 'Clorox' },
+    { symbol: 'EL',   companyName: 'Estée Lauder' },
+    { symbol: 'TAP',  companyName: 'Molson Coors' },
+    { symbol: 'STZ',  companyName: 'Constellation Brands' },
+    { symbol: 'KHC',  companyName: 'Kraft Heinz' },
+    { symbol: 'MDLZ', companyName: 'Mondelez International' },
+    { symbol: 'POST', companyName: 'Post Holdings' },
+    { symbol: 'TSN',  companyName: 'Tyson Foods' },
+    { symbol: 'ADM',  companyName: 'Archer-Daniels-Midland' },
+    { symbol: 'BG',   companyName: 'Bunge Global' },
+    { symbol: 'INGR', companyName: 'Ingredion' },
+    { symbol: 'SPB',  companyName: 'Spectrum Brands' },
+    { symbol: 'SFM',  companyName: 'Sprouts Farmers Market' },
+    { symbol: 'USFD', companyName: 'US Foods' },
+    { symbol: 'PFGC', companyName: 'Performance Food Group' },
+  ],
+
+  // ── Energy ────────────────────────────────────────────────────────────────
+  'Energy': [
+    { symbol: 'XOM',  companyName: 'ExxonMobil' },
+    { symbol: 'CVX',  companyName: 'Chevron' },
+    { symbol: 'COP',  companyName: 'ConocoPhillips' },
+    { symbol: 'EOG',  companyName: 'EOG Resources' },
+    { symbol: 'SLB',  companyName: 'SLB' },
+    { symbol: 'OXY',  companyName: 'Occidental Petroleum' },
+    { symbol: 'MPC',  companyName: 'Marathon Petroleum' },
+    { symbol: 'VLO',  companyName: 'Valero Energy' },
+    { symbol: 'PSX',  companyName: 'Phillips 66' },
+    { symbol: 'DVN',  companyName: 'Devon Energy' },
+    { symbol: 'FANG', companyName: 'Diamondback Energy' },
+    { symbol: 'BKR',  companyName: 'Baker Hughes' },
+    { symbol: 'HAL',  companyName: 'Halliburton' },
+    { symbol: 'KMI',  companyName: 'Kinder Morgan' },
+    { symbol: 'WMB',  companyName: 'Williams Companies' },
+    { symbol: 'OKE',  companyName: 'ONEOK' },
+    { symbol: 'ET',   companyName: 'Energy Transfer' },
+    { symbol: 'EPD',  companyName: 'Enterprise Products Partners' },
+    { symbol: 'TRGP', companyName: 'Targa Resources' },
+    { symbol: 'APA',  companyName: 'APA Corporation' },
+    { symbol: 'EQT',  companyName: 'EQT Corporation' },
+    { symbol: 'AR',   companyName: 'Antero Resources' },
+    { symbol: 'CNX',  companyName: 'CNX Resources' },
+    { symbol: 'RRC',  companyName: 'Range Resources' },
+    { symbol: 'CTRA', companyName: 'Coterra Energy' },
+    { symbol: 'PR',   companyName: 'Permian Resources' },
+    { symbol: 'NOG',  companyName: 'Northern Oil & Gas' },
+    { symbol: 'DK',   companyName: 'Delek US Holdings' },
+    { symbol: 'PBF',  companyName: 'PBF Energy' },
+    { symbol: 'TTE',  companyName: 'TotalEnergies' },
+  ],
+
+  // ── Financials ───────────────────────────────────────────────────────────
+  // Note: D/E threshold is intentionally high for banks (leverage is core business).
+  'Financials': [
+    { symbol: 'JPM',  companyName: 'JPMorgan Chase' },
+    { symbol: 'BAC',  companyName: 'Bank of America' },
+    { symbol: 'WFC',  companyName: 'Wells Fargo' },
+    { symbol: 'GS',   companyName: 'Goldman Sachs' },
+    { symbol: 'MS',   companyName: 'Morgan Stanley' },
+    { symbol: 'C',    companyName: 'Citigroup' },
+    { symbol: 'BLK',  companyName: 'BlackRock' },
+    { symbol: 'SCHW', companyName: 'Charles Schwab' },
+    { symbol: 'AXP',  companyName: 'American Express' },
+    { symbol: 'V',    companyName: 'Visa' },
+    { symbol: 'MA',   companyName: 'Mastercard' },
+    { symbol: 'COF',  companyName: 'Capital One' },
+    { symbol: 'MCO',  companyName: "Moody's" },
+    { symbol: 'SPGI', companyName: 'S&P Global' },
+    { symbol: 'ICE',  companyName: 'Intercontinental Exchange' },
+    { symbol: 'CME',  companyName: 'CME Group' },
+    { symbol: 'CB',   companyName: 'Chubb' },
+    { symbol: 'AIG',  companyName: 'AIG' },
+    { symbol: 'PRU',  companyName: 'Prudential Financial' },
+    { symbol: 'MET',  companyName: 'MetLife' },
+    { symbol: 'AFL',  companyName: 'Aflac' },
+    { symbol: 'TRV',  companyName: 'Travelers' },
+    { symbol: 'ALL',  companyName: 'Allstate' },
+    { symbol: 'PGR',  companyName: 'Progressive' },
+    { symbol: 'USB',  companyName: 'U.S. Bancorp' },
+    { symbol: 'TFC',  companyName: 'Truist Financial' },
+    { symbol: 'PNC',  companyName: 'PNC Financial Services' },
+    { symbol: 'FITB', companyName: 'Fifth Third Bancorp' },
+    { symbol: 'KEY',  companyName: 'KeyCorp' },
+    { symbol: 'BK',   companyName: 'Bank of New York Mellon' },
+  ],
+
+  // ── Industrials ──────────────────────────────────────────────────────────
+  'Industrials': [
+    { symbol: 'GE',   companyName: 'GE Aerospace' },
+    { symbol: 'HON',  companyName: 'Honeywell' },
+    { symbol: 'RTX',  companyName: 'RTX Corporation' },
+    { symbol: 'LMT',  companyName: 'Lockheed Martin' },
+    { symbol: 'GD',   companyName: 'General Dynamics' },
+    { symbol: 'NOC',  companyName: 'Northrop Grumman' },
+    { symbol: 'BA',   companyName: 'Boeing' },
+    { symbol: 'CAT',  companyName: 'Caterpillar' },
+    { symbol: 'DE',   companyName: 'Deere & Company' },
+    { symbol: 'EMR',  companyName: 'Emerson Electric' },
+    { symbol: 'ETN',  companyName: 'Eaton' },
+    { symbol: 'ROK',  companyName: 'Rockwell Automation' },
+    { symbol: 'PH',   companyName: 'Parker Hannifin' },
+    { symbol: 'AME',  companyName: 'AMETEK' },
+    { symbol: 'SWK',  companyName: 'Stanley Black & Decker' },
+    { symbol: 'ITT',  companyName: 'ITT Inc.' },
+    { symbol: 'IR',   companyName: 'Ingersoll Rand' },
+    { symbol: 'XYL',  companyName: 'Xylem' },
+    { symbol: 'ROP',  companyName: 'Roper Technologies' },
+    { symbol: 'VRSK', companyName: 'Verisk Analytics' },
+    { symbol: 'FAST', companyName: 'Fastenal' },
+    { symbol: 'GWW',  companyName: 'W.W. Grainger' },
+    { symbol: 'RSG',  companyName: 'Republic Services' },
+    { symbol: 'WM',   companyName: 'Waste Management' },
+    { symbol: 'CTAS', companyName: 'Cintas' },
+    { symbol: 'CSX',  companyName: 'CSX Corporation' },
+    { symbol: 'UNP',  companyName: 'Union Pacific' },
+    { symbol: 'NSC',  companyName: 'Norfolk Southern' },
+    { symbol: 'FDX',  companyName: 'FedEx' },
+    { symbol: 'UPS',  companyName: 'United Parcel Service' },
+  ],
+
+  // ── Broad Market (default) ───────────────────────────────────────────────
   default: [
     { symbol: 'AAPL', companyName: 'Apple' },
     { symbol: 'MSFT', companyName: 'Microsoft' },
@@ -157,6 +400,21 @@ const SECTOR_TICKERS = {
     { symbol: 'ABT',  companyName: 'Abbott Laboratories' },
     { symbol: 'TMO',  companyName: 'Thermo Fisher Scientific' },
     { symbol: 'NEE',  companyName: 'NextEra Energy' },
+    { symbol: 'DUK',  companyName: 'Duke Energy' },
+    { symbol: 'MRK',  companyName: 'Merck' },
+    { symbol: 'ABBV', companyName: 'AbbVie' },
+    { symbol: 'TXN',  companyName: 'Texas Instruments' },
+    { symbol: 'CSCO', companyName: 'Cisco Systems' },
+    { symbol: 'IBM',  companyName: 'IBM' },
+    { symbol: 'COP',  companyName: 'ConocoPhillips' },
+    { symbol: 'SO',   companyName: 'Southern Company' },
+    { symbol: 'MCD',  companyName: "McDonald's" },
+    { symbol: 'COST', companyName: 'Costco Wholesale' },
+    { symbol: 'V',    companyName: 'Visa' },
+    { symbol: 'MA',   companyName: 'Mastercard' },
+    { symbol: 'LMT',  companyName: 'Lockheed Martin' },
+    { symbol: 'CAT',  companyName: 'Caterpillar' },
+    { symbol: 'GE',   companyName: 'GE Aerospace' },
   ],
 };
 
@@ -226,33 +484,48 @@ async function fetchOneTicker(symbol) {
     // Structural Risk inputs — all decimal format
     revenue_growth:    fd.revenueGrowth  ?? null,  // 0.18 = 18% TTM growth
     return_on_equity:  fd.returnOnEquity ?? null,  // 0.34 = 34% TTM ROE
-      payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
-      interest_coverage: computeInterestCoverage(fd), // proxy: op.income / (totalDebt × 5%)
+    payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
+    interest_coverage: computeInterestCoverage(fd), // proxy: ebitda / (totalDebt × 5%)
   };
 }
 
 /**
- * Fetches all tickers concurrently. Promise.allSettled ensures one failed
- * ticker never aborts the batch. Returns { results, skipped }.
+ * Fetches tickers in sequential batches to avoid Yahoo Finance 429 rate-limits.
+ *
+ * Within each batch, requests run concurrently (Promise.allSettled).
+ * A short pause between batches keeps the aggregate request rate well below
+ * Yahoo Finance's per-IP threshold without meaningfully increasing total latency.
+ *
+ * @param {Array}  tickers   - Array of { symbol, companyName } objects
+ * @param {number} batchSize - Tickers fetched concurrently per batch (default 10)
+ * @param {number} delayMs   - Pause between batches in ms (default 250)
  */
-async function fetchAllTickers(tickers) {
-  const settled = await Promise.allSettled(
-    tickers.map(t => fetchOneTicker(t.symbol))
-  );
-
+async function fetchAllTickers(tickers, batchSize = 10, delayMs = 250) {
   const results = [];
   let   skipped = 0;
 
-  for (let i = 0; i < tickers.length; i++) {
-    const outcome = settled[i];
-    if (outcome.status === 'fulfilled' && outcome.value !== null) {
-      results.push({
-        symbol:         tickers[i].symbol,
-        companyName:    tickers[i].companyName ?? tickers[i].symbol,
-        observedValues: outcome.value,
-      });
-    } else {
-      skipped++;
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const chunk   = tickers.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(
+      chunk.map(t => fetchOneTicker(t.symbol))
+    );
+
+    for (let j = 0; j < chunk.length; j++) {
+      const outcome = settled[j];
+      if (outcome.status === 'fulfilled' && outcome.value !== null) {
+        results.push({
+          symbol:         chunk[j].symbol,
+          companyName:    chunk[j].companyName ?? chunk[j].symbol,
+          observedValues: outcome.value,
+        });
+      } else {
+        skipped++;
+      }
+    }
+
+    // Pause between batches (skip delay after the final batch)
+    if (i + batchSize < tickers.length) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
 

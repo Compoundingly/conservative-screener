@@ -422,11 +422,16 @@
                        focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
                        transition-colors cursor-pointer"
               >
+                <option value="Consumer Staples">Consumer Staples</option>
+                <option value="Energy">Energy</option>
+                <option value="Financials">Financials</option>
+                <option value="Healthcare">Healthcare</option>
+                <option value="Industrials">Industrials</option>
                 <option value="Real Estate">Real Estate</option>
                 <option value="Retail">Retail</option>
                 <option value="Technology">Technology</option>
                 <option value="Utilities">Utilities</option>
-                <option value="default">General (Default Thresholds)</option>
+                <option value="default">Broad Market</option>
               </select>
             </div>
 
@@ -526,13 +531,28 @@
      * Operators and field definitions are inherited from FIELD_REGISTRY.
      * 'default' is used when no sector-specific config exists.
      */
-    // debt_to_equity thresholds are in Yahoo Finance % format (79.5 = 0.795x D/E ratio)
+    // debt_to_equity thresholds are in Yahoo Finance % format (100 = 1.0× D/E ratio)
     const SECTOR_CONFIG = {
-      default:        { current_ratio: 2.0, debt_to_equity: 150, price_to_book: 1.5, price_to_earnings: 15.0 },
-      'Real Estate':  { current_ratio: 1.2, debt_to_equity: 400, price_to_book: 2.5, price_to_earnings: 25.0 },
-      'Retail':       { current_ratio: 1.5, debt_to_equity: 250, price_to_book: 3.0, price_to_earnings: 20.0 },
-      'Technology':   { current_ratio: 1.5, debt_to_equity: 100, price_to_book: 5.0, price_to_earnings: 30.0 },
-      'Utilities':    { current_ratio: 1.0, debt_to_equity: 300, price_to_book: 2.0, price_to_earnings: 20.0 },
+      // Conservative base thresholds (Graham-style)
+      default:             { current_ratio: 2.0, debt_to_equity:  150, price_to_book: 1.5,  price_to_earnings: 15.0 },
+
+      // Sectors with real-asset backing — higher D/E and P/B are structurally normal
+      'Real Estate':       { current_ratio: 1.2, debt_to_equity:  400, price_to_book: 2.5,  price_to_earnings: 25.0 },
+      'Utilities':         { current_ratio: 1.0, debt_to_equity:  300, price_to_book: 2.0,  price_to_earnings: 20.0 },
+      'Energy':            { current_ratio: 1.2, debt_to_equity:  100, price_to_book: 2.0,  price_to_earnings: 15.0 },
+
+      // Consumer sectors — moderate leverage, some brand premium in P/B
+      'Retail':            { current_ratio: 1.5, debt_to_equity:  250, price_to_book: 3.0,  price_to_earnings: 20.0 },
+      'Consumer Staples':  { current_ratio: 1.2, debt_to_equity:  200, price_to_book: 5.0,  price_to_earnings: 20.0 },
+
+      // Knowledge / IP sectors — lower leverage expected, premium P/B acceptable
+      'Technology':        { current_ratio: 1.5, debt_to_equity:  100, price_to_book: 5.0,  price_to_earnings: 30.0 },
+      'Healthcare':        { current_ratio: 1.5, debt_to_equity:  150, price_to_book: 5.0,  price_to_earnings: 20.0 },
+      'Industrials':       { current_ratio: 1.5, debt_to_equity:  150, price_to_book: 3.0,  price_to_earnings: 20.0 },
+
+      // Financials: D/E is structurally high for banks (deposits = liabilities).
+      // Threshold set very high to avoid false positives; P/B and P/E are the useful signals.
+      'Financials':        { current_ratio: 1.0, debt_to_equity: 1200, price_to_book: 2.0,  price_to_earnings: 15.0 },
     };
 
     /**
