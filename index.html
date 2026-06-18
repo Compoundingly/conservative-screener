@@ -430,23 +430,6 @@
               </select>
             </div>
 
-            <!-- Sort-by dropdown -->
-            <div class="flex flex-col gap-1.5">
-              <label for="sort-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Sort By</label>
-              <select
-                id="sort-select"
-                class="bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
-                       text-sm text-slate-200 font-medium
-                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
-                       transition-colors cursor-pointer"
-              >
-                <option value="price_to_earnings">Price-to-Earnings</option>
-                <option value="price_to_book">Price-to-Book</option>
-                <option value="current_ratio">Current Ratio</option>
-                <option value="debt_to_equity">Debt/Equity</option>
-              </select>
-            </div>
-
             <!-- Margin of Safety -->
             <div class="flex flex-col gap-1.5">
               <label for="mos-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Margin of Safety</label>
@@ -959,10 +942,6 @@
                        : (field?.rankDir ?? 'asc');
       }
 
-      // Keep the sort-by dropdown in sync for ratio columns
-      if (FIELD_REGISTRY.some(f => f.id === colId)) {
-        document.getElementById('sort-select').value = colId;
-      }
 
       const activeConfig = getActiveConfig(_sectorName ?? 'default', getMoS());
       const ranked       = rankCompanies(_sectorCompanies, _sortState.id, _sortState.dir, activeConfig);
@@ -991,7 +970,7 @@
     // ── SECTOR ORCHESTRATOR ──────────────────────────────────────────────────────
     async function runSectorScan() {
       const sector    = document.getElementById('sector-select').value;
-      const sortBy    = document.getElementById('sort-select').value;
+      const sortBy    = 'price_to_earnings'; // default initial sort; user can click headers to change
       const scanBtn   = document.getElementById('scan-btn');
       const errorEl   = document.getElementById('sector-error');
       const container = document.getElementById('sector-table-container');
