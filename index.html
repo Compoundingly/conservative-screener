@@ -489,6 +489,64 @@
        ===================================================================== -->
   <script>
     /**
+     * FILTER_CONFIG — Single source of truth for all quantitative screening criteria.
+     *
+     * Each entry defines one measurable threshold used by the Calculation Layer.
+     * The UI Renderer must only consume `observedValue`, `threshold`, `operator`,
+     * and `passed` — never derive or infer additional meaning from these values.
+     *
+     * Fields:
+     *   id         {string}  — Stable machine identifier for this criterion.
+     *   label      {string}  — Human-readable display name (no advice language).
+     *   filter     {string}  — Parent filter group this criterion belongs to.
+     *   operator   {string}  — Comparison operator: ">=" | "<=" | ">" | "<" | "===".
+     *   threshold  {number}  — The numeric boundary value for the comparison.
+     *   unit       {string}  — Display unit suffix (e.g. "x", "%", "$", "").
+     */
+    const FILTER_CONFIG = [
+      {
+        id:        'current_ratio',
+        label:     'Current Ratio',
+        filter:    'Liquidity Stress Test',
+        operator:  '>=',
+        threshold: 2.0,
+        unit:      'x',
+      },
+      {
+        id:        'ltd_to_nwc',
+        label:     'LTD to Net Working Capital',
+        filter:    'Capital Structure Filter',
+        operator:  '<=',
+        threshold: 1.0,
+        unit:      'x',
+      },
+      {
+        id:        'interest_coverage',
+        label:     'Interest Coverage',
+        filter:    'Capital Structure Filter',
+        operator:  '>=',
+        threshold: 5.0,
+        unit:      'x',
+      },
+      {
+        id:        'price_to_book',
+        label:     'Price-to-Book',
+        filter:    'Valuation Ratio Filter',
+        operator:  '<=',
+        threshold: 1.5,
+        unit:      'x',
+      },
+      {
+        id:        'price_to_earnings',
+        label:     'Price-to-Earnings',
+        filter:    'Valuation Ratio Filter',
+        operator:  '<=',
+        threshold: 15.0,
+        unit:      'x',
+      },
+    ];
+
+    /**
      * Enables the CTA button when the acknowledgement checkbox is checked.
      * The button remains disabled (and visually locked) until the user
      * explicitly confirms they have read the disclaimer.
