@@ -305,153 +305,72 @@
     <main class="flex-1 max-w-7xl mx-auto w-full px-6 py-10">
 
       <!-- Page heading -->
-      <div class="mb-8 fade-in">
-        <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
+      <div class="mb-6 fade-in">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
+          <span id="heading-ticker" class="hidden font-mono text-lg text-slate-400"></span>
+        </div>
         <p class="mt-1.5 text-sm text-slate-500 max-w-xl">
           Apply mathematical threshold criteria to publicly available financial data.
           All outputs represent arithmetic comparisons only and do not constitute financial advice.
         </p>
+        <p id="heading-date" class="hidden mt-1 text-xs text-slate-600 font-mono"></p>
       </div>
 
-      <!-- Placeholder filter cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fade-in">
-
-        <!-- Card: Liquidity Stress Test -->
-        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Liquidity Stress Test</span>
-            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
+      <!-- Ticker input row -->
+      <div class="mb-8 fade-in">
+        <div class="flex items-center gap-3 max-w-sm">
+          <div class="relative flex-1">
+            <input
+              id="ticker-input"
+              type="text"
+              maxlength="5"
+              placeholder="Ticker symbol (e.g. AAPL)"
+              autocomplete="off"
+              autocorrect="off"
+              spellcheck="false"
+              onkeydown="if(event.key==='Enter') runScreener()"
+              oninput="this.value=this.value.toUpperCase()"
+              class="w-full bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                     text-sm font-mono text-slate-200 placeholder-slate-600
+                     focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                     transition-colors"
+            />
           </div>
-          <div class="space-y-2">
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Current Ratio</span>
-              <span class="font-mono text-slate-300">2.41 <span class="text-slate-600">≥ 2.00</span></span>
-            </div>
-            <div class="w-full h-px bg-slate-700/50"></div>
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Quick Ratio</span>
-              <span class="font-mono text-slate-300">1.87 <span class="text-slate-600">≥ 1.00</span></span>
-            </div>
-          </div>
-          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>2 / 2 criteria met</span>
-          </div>
+          <button
+            id="run-btn"
+            onclick="runScreener()"
+            class="flex-shrink-0 px-5 py-2.5 rounded-lg text-sm font-semibold
+                   bg-slate-700 text-slate-200 border border-slate-600
+                   hover:bg-slate-600 hover:border-slate-500
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   transition-all duration-150"
+          >
+            Run Filters
+          </button>
         </div>
-
-        <!-- Card: Capital Structure Filter -->
-        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Capital Structure Filter</span>
-            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Unmet</span>
-          </div>
-          <div class="space-y-2">
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Debt-to-Equity</span>
-              <span class="font-mono text-slate-300">1.92 <span class="text-slate-600">≤ 1.00</span></span>
-            </div>
-            <div class="w-full h-px bg-slate-700/50"></div>
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Interest Coverage</span>
-              <span class="font-mono text-slate-300">4.10 <span class="text-slate-600">≥ 3.00</span></span>
-            </div>
-          </div>
-          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>1 / 2 criteria met</span>
-          </div>
-        </div>
-
-        <!-- Card: Earnings Consistency Check -->
-        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Earnings Consistency Check</span>
-            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
-          </div>
-          <div class="space-y-2">
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">EPS (TTM)</span>
-              <span class="font-mono text-slate-300">3.22 <span class="text-slate-600">&gt; 0</span></span>
-            </div>
-            <div class="w-full h-px bg-slate-700/50"></div>
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Positive EPS (10 yr)</span>
-              <span class="font-mono text-slate-300">10 / 10</span>
-            </div>
-          </div>
-          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>2 / 2 criteria met</span>
-          </div>
-        </div>
-
-        <!-- Card: Dividend Continuity Check -->
-        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Dividend Continuity Check</span>
-            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
-          </div>
-          <div class="space-y-2">
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Consecutive Dividend Years</span>
-              <span class="font-mono text-slate-300">22 <span class="text-slate-600">≥ 20</span></span>
-            </div>
-            <div class="w-full h-px bg-slate-700/50"></div>
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Payout Ratio</span>
-              <span class="font-mono text-slate-300">38% <span class="text-slate-600">≤ 60%</span></span>
-            </div>
-          </div>
-          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>2 / 2 criteria met</span>
-          </div>
-        </div>
-
-        <!-- Card: Valuation Ratio Filter -->
-        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Valuation Ratio Filter</span>
-            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Unmet</span>
-          </div>
-          <div class="space-y-2">
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">P/E Ratio</span>
-              <span class="font-mono text-slate-300">24.1 <span class="text-slate-600">≤ 15.0</span></span>
-            </div>
-            <div class="w-full h-px bg-slate-700/50"></div>
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">P/B Ratio</span>
-              <span class="font-mono text-slate-300">3.8 <span class="text-slate-600">≤ 1.5</span></span>
-            </div>
-          </div>
-          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>0 / 2 criteria met</span>
-          </div>
-        </div>
-
-        <!-- Card: Asset Backing Assessment -->
-        <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Asset Backing Assessment</span>
-            <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">Criteria Satisfied</span>
-          </div>
-          <div class="space-y-2">
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Net Asset Value / Share</span>
-              <span class="font-mono text-slate-300">$18.44 <span class="text-slate-600">&gt; $10</span></span>
-            </div>
-            <div class="w-full h-px bg-slate-700/50"></div>
-            <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400">Working Capital Positive</span>
-              <span class="font-mono text-slate-300">Pass</span>
-            </div>
-          </div>
-          <div class="pt-1 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>2 / 2 criteria met</span>
-          </div>
-        </div>
-
+        <p id="ticker-error" class="hidden mt-2 text-xs text-slate-500"></p>
       </div>
 
-      <!-- Overall completion rate summary -->
-      <div class="mt-6 bg-brand-800 border border-slate-700/60 rounded-xl p-5 fade-in">
+      <!-- Dynamic filter cards — populated by renderDashboard() -->
+      <div
+        id="filter-cards-container"
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 fade-in"
+      >
+        <!-- Empty state: shown before the first Run Filters call -->
+        <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
+          <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
+            <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-.293.707L13 10.414V15a1 1 0 01-.553.894l-4 2A1 1 0 017 17v-6.586L3.293 6.707A1 1 0 013 6V4z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <p class="text-sm text-slate-500">Enter a ticker symbol above and click <span class="font-semibold text-slate-400">Run Filters</span> to screen against live data.</p>
+          <p class="mt-1 text-xs text-slate-600">Outputs are arithmetic comparisons only. Not financial advice.</p>
+        </div>
+      </div>
+
+      <!-- Overall completion rate summary — hidden until renderDashboard() populates it -->
+      <div id="completion-summary" class="hidden mt-6 bg-brand-800 border border-slate-700/60 rounded-xl p-5 fade-in">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">Overall Completion Rate</p>
@@ -461,13 +380,13 @@
             </p>
           </div>
           <div class="flex-shrink-0 text-right">
-            <p class="text-3xl font-mono font-semibold text-slate-200">8 <span class="text-slate-600 text-lg">/</span> 12</p>
-            <p class="text-xs text-slate-500 mt-0.5 font-mono">67% criteria met</p>
+            <p id="summary-fraction" class="text-3xl font-mono font-semibold text-slate-200"></p>
+            <p id="summary-pct" class="text-xs text-slate-500 mt-0.5 font-mono"></p>
           </div>
         </div>
         <!-- Progress bar (neutral) -->
         <div class="mt-4 w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-          <div class="h-full bg-slate-500 rounded-full" style="width: 67%;"></div>
+          <div id="summary-bar" class="h-full bg-slate-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
         </div>
       </div>
 
@@ -545,6 +464,180 @@
         unit:      'x',
       },
     ];
+
+    // ── DATA LAYER ──────────────────────────────────────────────────────────────
+    /**
+     * Calls the Vercel serverless proxy at /api/ratios.
+     * Returns { ticker, fiscalDateEnding, observedValues } or throws on error.
+     */
+    async function fetchRatios(ticker) {
+      const res = await fetch(`/api/ratios?ticker=${encodeURIComponent(ticker)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to retrieve data. Please try again.');
+      return data;
+    }
+
+    // ── CALCULATION LAYER ────────────────────────────────────────────────────────
+    /**
+     * Pure function. No DOM access.
+     * Applies each criterion's operator/threshold comparison against the observed value.
+     * Returns null for `passed` when the observed value is unavailable.
+     */
+    function evaluate(observed, operator, threshold) {
+      if (observed === null || observed === undefined) return null;
+      switch (operator) {
+        case '>=':  return observed >= threshold;
+        case '<=':  return observed <= threshold;
+        case '>':   return observed >  threshold;
+        case '<':   return observed <  threshold;
+        case '===': return observed === threshold;
+        default:    return null;
+      }
+    }
+
+    function runCalculationLayer(observedValues) {
+      return FILTER_CONFIG.map(criterion => ({
+        ...criterion,
+        observedValue: observedValues[criterion.id] ?? null,
+        passed:        evaluate(
+                         observedValues[criterion.id] ?? null,
+                         criterion.operator,
+                         criterion.threshold
+                       ),
+      }));
+    }
+
+    // ── PRESENTATION LAYER ───────────────────────────────────────────────────────
+    /**
+     * Consumes only: passed, observedValue, threshold, operator, label, filter, unit.
+     * Never performs arithmetic. Groups results by `filter`, then rebuilds the DOM.
+     */
+    function operatorSymbol(op) {
+      return { '>=': '≥', '<=': '≤', '>': '>', '<': '<', '===': '=' }[op] ?? op;
+    }
+
+    function formatValue(val, unit) {
+      if (val === null || val === undefined) return 'N/A';
+      const str = Number.isInteger(val) ? String(val) : Number(val).toFixed(2);
+      return unit ? `${str}${unit}` : str;
+    }
+
+    function renderDashboard(results, ticker, fiscalDate) {
+      // Update heading ticker badge
+      const tickerEl = document.getElementById('heading-ticker');
+      tickerEl.textContent = `— ${ticker}`;
+      tickerEl.classList.remove('hidden');
+
+      if (fiscalDate) {
+        const dateEl = document.getElementById('heading-date');
+        dateEl.textContent = `Data as of ${fiscalDate}`;
+        dateEl.classList.remove('hidden');
+      }
+
+      // Group criteria by their parent filter name
+      const groups = results.reduce((acc, r) => {
+        (acc[r.filter] = acc[r.filter] || []).push(r);
+        return acc;
+      }, {});
+
+      // Build card HTML for each group
+      const container = document.getElementById('filter-cards-container');
+      container.innerHTML = Object.entries(groups).map(([groupName, items]) => {
+        const total     = items.length;
+        const satisfied = items.filter(i => i.passed === true).length;
+        const hasNull   = items.some(i => i.passed === null);
+        const allPass   = satisfied === total && !hasNull;
+        const statusLabel = hasNull
+          ? 'Data Unavailable'
+          : (allPass ? 'Criteria Satisfied' : 'Criteria Unmet');
+
+        const rows = items.map((item, idx) => {
+          const observed  = formatValue(item.observedValue, item.unit);
+          const threshold = `${operatorSymbol(item.operator)}\u00a0${item.threshold}${item.unit}`;
+          const divider   = idx < items.length - 1
+            ? `<div class="w-full h-px bg-slate-700/50"></div>`
+            : '';
+          return `
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-slate-400">${item.label}</span>
+              <span class="font-mono text-slate-300">${observed} <span class="text-slate-600">${threshold}</span></span>
+            </div>${divider}`;
+        }).join('');
+
+        return `
+          <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">${groupName}</span>
+              <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">${statusLabel}</span>
+            </div>
+            <div class="space-y-2">${rows}</div>
+            <div class="pt-1 text-xs text-slate-500">${satisfied} / ${total} criteria met</div>
+          </div>`;
+      }).join('');
+
+      // Update completion rate summary
+      const total     = results.length;
+      const satisfied = results.filter(r => r.passed === true).length;
+      const pct       = total > 0 ? Math.round((satisfied / total) * 100) : 0;
+
+      document.getElementById('summary-fraction').innerHTML =
+        `${satisfied} <span class="text-slate-600 text-lg">/</span> ${total}`;
+      document.getElementById('summary-pct').textContent  = `${pct}% criteria met`;
+      document.getElementById('summary-bar').style.width  = `${pct}%`;
+      document.getElementById('completion-summary').classList.remove('hidden');
+    }
+
+    // ── ORCHESTRATOR ─────────────────────────────────────────────────────────────
+    /**
+     * Triggered by the Run Filters button.
+     * Validates input → fetches → calculates → renders.
+     */
+    async function runScreener() {
+      const input     = document.getElementById('ticker-input');
+      const errorEl   = document.getElementById('ticker-error');
+      const container = document.getElementById('filter-cards-container');
+      const runBtn    = document.getElementById('run-btn');
+
+      const ticker = input.value.trim().toUpperCase();
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+
+      if (!/^[A-Za-z]{1,5}$/.test(ticker)) {
+        errorEl.textContent = 'Enter a valid ticker symbol (1–5 letters, e.g. AAPL).';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      // Loading state
+      runBtn.disabled      = true;
+      runBtn.textContent   = 'Fetching…';
+      document.getElementById('completion-summary').classList.add('hidden');
+      document.getElementById('heading-ticker').classList.add('hidden');
+      document.getElementById('heading-date').classList.add('hidden');
+
+      container.innerHTML = `
+        <div class="col-span-full flex items-center justify-center py-20 text-slate-500 text-sm">
+          <svg class="animate-spin w-4 h-4 mr-2.5 text-slate-500" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          Retrieving data for <span class="font-mono ml-1 text-slate-400">${ticker}</span>…
+        </div>`;
+
+      try {
+        const data    = await fetchRatios(ticker);
+        const results = runCalculationLayer(data.observedValues);
+        renderDashboard(results, ticker, data.fiscalDateEnding);
+      } catch (err) {
+        container.innerHTML = `
+          <div class="col-span-full bg-brand-800 border border-slate-700/60 rounded-xl p-6 text-center">
+            <p class="text-sm text-slate-500">${err.message || 'An unexpected error occurred. Please try again.'}</p>
+          </div>`;
+      } finally {
+        runBtn.disabled    = false;
+        runBtn.textContent = 'Run Filters';
+      }
+    }
 
     /**
      * Enables the CTA button when the acknowledgement checkbox is checked.
