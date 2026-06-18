@@ -647,7 +647,7 @@
       return unit ? `${str}${unit}` : str;
     }
 
-    function renderDashboard(results, ticker, fiscalDate) {
+    function renderDashboard(results, ticker, fiscalDate, observedValues) {
       const tickerEl = document.getElementById('heading-context');
       tickerEl.textContent = `— ${ticker}`;
       tickerEl.classList.remove('hidden');
@@ -658,15 +658,13 @@
         dateEl.classList.remove('hidden');
       }
 
-      // Group criteria by their parent filter name
+      // ── Ratio filter cards ────────────────────────────────────────────────────
       const groups = results.reduce((acc, r) => {
         (acc[r.filter] = acc[r.filter] || []).push(r);
         return acc;
       }, {});
 
-      // Build card HTML for each group
-      const container = document.getElementById('filter-cards-container');
-      container.innerHTML = Object.entries(groups).map(([groupName, items]) => {
+      const ratioCards = Object.entries(groups).map(([groupName, items]) => {
         const total     = items.length;
         const satisfied = items.filter(i => i.passed === true).length;
         const hasNull   = items.some(i => i.passed === null);
@@ -681,7 +679,6 @@
           const divider   = idx < items.length - 1
             ? `<div class="w-full h-px bg-slate-700/50"></div>`
             : '';
-          // Compliant colors per .cursorrules (no green/red):
           const valCls = item.passed === true  ? 'text-sky-300'
                        : item.passed === false ? 'text-slate-500'
                        : 'text-slate-700';
@@ -703,7 +700,158 @@
           </div>`;
       }).join('');
 
-      // Update completion rate summary
+      // ── Structural Risk card ──────────────────────────────────────────────────
+      // Compute individual check states so the single-ticker view shows full detail,
+      // not just the aggregate flag that the sector scan table shows.
+      let structuralRiskCard = '';
+      if (observedValues) {
+        const ov = observedValues;
+
+        // 1. Vitality
+        const vitStatus = calculateVitalityCheck(ov);
+        const vitRow = buildSRRow(
+          'Vitality',
+          'Revenue Growth ≥ 2% &amp; ROE ≥ 10%',
+          vitStatus === 'met'     ? 'pass'
+        : vitStatus === 'unmet'   ? 'fail'
+        : 'unknown',
+          vitStatus === 'met'     ? 'Met'
+        : vitStatus === 'unmet'   ? 'Below threshold'
+        : '— No data'
+        );
+
+        // 2. Dividend Trap
+        const pr = ov.payout_ratio ?? null;
+        const hasDividend = pr !== null && pr > 0;
+        const divRow = buildSRRow(
+          'Dividend Trap',
+          'Payout Ratio ≤ 80%',
+          pr === null             ? 'unknown'
+        : !hasDividend            ? 'pass'
+        : pr > STRUCTURAL_THRESHOLDS.payoutRatio ? 'fail' : 'pass',
+          pr === null             ? '— No data'
+        : !hasDividend            ? 'No dividend'
+        : pr > STRUCTURAL_THRESHOLDS.payoutRatio
+            ? `${(pr * 100).toFixed(0)}% payout`
+            : `${(pr * 100).toFixed(0)}% payout`
+        );
+
+        // 3. Debt Load
+        const de = ov.debt_to_equity ?? null;
+        const debtTriggered = de !== null && (de > STRUCTURAL_THRESHOLDS.debtToEquity || de < 0);
+        const deRow = buildSRRow(
+          'Debt Load',
+          'D/E ≤ 1.0× (100 in YF format)',
+          de === null ? 'unknown' : debtTriggered ? 'fail' : 'pass',
+          de === null ? '— No data'
+        : debtTriggered
+            ? `${de.toFixed(1)} (>${STRUCTURAL_THRESHOLDS.debtToEquity})`
+            : `${de.toFixed(1)}`
+        );
+
+        // 4. Interest Coverage
+        const ic = ov.interest_coverage ?? null;
+        const covTriggered = ic !== null && ic < STRUCTURAL_THRESHOLDS.interestCoverage;
+        const covRow = buildSRRow(
+          'Coverage',
+          `EBITDA Coverage ≥ ${STRUCTURAL_THRESHOLDS.interestCoverage}×`,
+          ic === null ? 'unknown' : covTriggered ? 'fail' : 'pass',
+          ic === null ? '— No debt / no data'
+        : covTriggered
+            ? `${ic.toFixed(2)}× (below ${STRUCTURAL_THRESHOLDS.interestCoverage}×)`
+            : `${ic.toFixed(2)}×`
+        );
+
+        const { level: srLevel, triggers: srTriggers } = calculateStructuralRisk(ov);
+        const srBadgeCls = srLevel === 'clear'     ? 'text-sky-300'
+                         : srLevel === 'triggered' ? 'text-slate-500'
+                         : 'text-slate-600';
+        const srBadge    = srLevel === 'clear'     ? '✓ No Triggers'
+                         : srLevel === 'triggered' ? `✗ ${srTriggers.join(', ')}`
+                         : '— Insufficient Data';
+        const triggerCount = srTriggers.length;
+
+        structuralRiskCard = `
+          <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Structural Risk</span>
+              <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 ${srBadgeCls}">${srBadge}</span>
+            </div>
+            <div class="space-y-2">
+              ${vitRow}
+              <div class="w-full h-px bg-slate-700/50"></div>
+              ${divRow}
+              <div class="w-full h-px bg-slate-700/50"></div>
+              ${deRow}
+              <div class="w-full h-px bg-slate-700/50"></div>
+              ${covRow}
+            </div>
+            <div class="pt-1 text-xs text-slate-500">${triggerCount} / 4 trigger${triggerCount !== 1 ? 's' : ''} active</div>
+          </div>`;
+      }
+
+      // ── Capital Efficiency card (ROIC vs WACC) ────────────────────────────────
+      let capitalCard = '';
+      if (observedValues) {
+        const roic = observedValues.roic ?? null;
+        const wacc = observedValues.wacc ?? null;
+        const beta = null; // beta not in observedValues; shown as N/A
+
+        if (roic !== null && wacc !== null) {
+          const spread      = roic - wacc;
+          const aboveWacc   = spread >= 0;
+          const spreadSign  = spread >= 0 ? '+' : '−';
+          const roicPct     = (roic * 100).toFixed(1);
+          const waccPct     = (wacc * 100).toFixed(1);
+          const spreadPct   = (Math.abs(spread) * 100).toFixed(1);
+          const badgeCls    = aboveWacc ? 'text-sky-300' : 'text-slate-500';
+          const badgeLabel  = aboveWacc
+            ? `✓ ROIC > WACC (+${spreadPct} pp)`
+            : `✗ ROIC < WACC (−${spreadPct} pp)`;
+          const roicCls     = aboveWacc ? 'text-sky-300' : 'text-slate-500';
+
+          capitalCard = `
+            <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Capital Efficiency</span>
+                <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 ${badgeCls}">${badgeLabel}</span>
+              </div>
+              <div class="space-y-2">
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-slate-400">Cash ROIC (approx.)</span>
+                  <span class="font-mono ${roicCls}">${roicPct}%</span>
+                </div>
+                <div class="w-full h-px bg-slate-700/50"></div>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-slate-400">WACC (approx.)</span>
+                  <span class="font-mono text-slate-400">${waccPct}%</span>
+                </div>
+                <div class="w-full h-px bg-slate-700/50"></div>
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-slate-400">Spread vs WACC</span>
+                  <span class="font-mono ${roicCls}">${spreadSign}${spreadPct} pp</span>
+                </div>
+              </div>
+              <div class="pt-1 text-xs text-slate-500">
+                EBITDA-based cash NOPAT &middot; CAPM WACC (rf&thinsp;=&thinsp;4.5%, MRP&thinsp;=&thinsp;5.5%) &middot; Not financial advice.
+              </div>
+            </div>`;
+        } else {
+          capitalCard = `
+            <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Capital Efficiency</span>
+                <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-700">— Insufficient Data</span>
+              </div>
+              <p class="text-sm text-slate-700 py-2">ROIC cannot be computed — required fields (EBITDA, D/E, or equity) are unavailable for this ticker.</p>
+            </div>`;
+        }
+      }
+
+      const container = document.getElementById('filter-cards-container');
+      container.innerHTML = ratioCards + structuralRiskCard + capitalCard;
+
+      // ── Completion rate summary ───────────────────────────────────────────────
       const total     = results.length;
       const satisfied = results.filter(r => r.passed === true).length;
       const pct       = total > 0 ? Math.round((satisfied / total) * 100) : 0;
@@ -713,6 +861,25 @@
       document.getElementById('summary-pct').textContent  = `${pct}% criteria met`;
       document.getElementById('summary-bar').style.width  = `${pct}%`;
       document.getElementById('completion-summary').classList.remove('hidden');
+    }
+
+    /**
+     * Builds one row for the Structural Risk detail card.
+     * status: 'pass' | 'fail' | 'unknown'
+     */
+    function buildSRRow(label, description, status, detail) {
+      const icon   = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '—';
+      const valCls = status === 'pass'    ? 'text-sky-300'
+                   : status === 'fail'    ? 'text-slate-500'
+                   : 'text-slate-700';
+      return `
+        <div class="flex justify-between items-start text-sm gap-3">
+          <div>
+            <span class="text-slate-400">${label}</span>
+            <span class="block text-xs text-slate-600 mt-0.5">${description}</span>
+          </div>
+          <span class="font-mono whitespace-nowrap ${valCls} flex-shrink-0">${icon} ${detail}</span>
+        </div>`;
     }
 
     // ── ORCHESTRATOR ─────────────────────────────────────────────────────────────
@@ -758,7 +925,7 @@
       try {
         const data    = await fetchRatios(ticker);
         const results = runCalculationLayer(data.observedValues, getActiveConfig('default'));
-        renderDashboard(results, ticker, data.fiscalDateEnding);
+        renderDashboard(results, ticker, data.fiscalDateEnding, data.observedValues);
       } catch (err) {
         container.innerHTML = `
           <div class="col-span-full bg-brand-800 border border-slate-700/60 rounded-xl p-6 text-center">
