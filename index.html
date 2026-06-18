@@ -443,8 +443,7 @@
                 <option value="price_to_earnings">Price-to-Earnings</option>
                 <option value="price_to_book">Price-to-Book</option>
                 <option value="current_ratio">Current Ratio</option>
-                <option value="interest_coverage">Interest Coverage</option>
-                <option value="ltd_to_nwc">LTD to Net Working Cap</option>
+                <option value="debt_to_equity">Debt/Equity</option>
               </select>
             </div>
 
@@ -514,11 +513,10 @@
      *   rankDir   — 'asc' (lower is more conservative) | 'desc' (higher is more conservative)
      */
     const FIELD_REGISTRY = [
-      { id: 'current_ratio',     label: 'Current Ratio',          filter: 'Liquidity Stress Test',   operator: '>=', unit: 'x', rankDir: 'desc' },
-      { id: 'ltd_to_nwc',        label: 'LTD to Net Working Cap', filter: 'Capital Structure Filter', operator: '<=', unit: 'x', rankDir: 'asc'  },
-      { id: 'interest_coverage', label: 'Interest Coverage',      filter: 'Capital Structure Filter', operator: '>=', unit: 'x', rankDir: 'desc' },
-      { id: 'price_to_book',     label: 'Price-to-Book',          filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x', rankDir: 'asc'  },
-      { id: 'price_to_earnings', label: 'Price-to-Earnings',      filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x', rankDir: 'asc'  },
+      { id: 'current_ratio',     label: 'Current Ratio',     filter: 'Liquidity Stress Test',   operator: '>=', unit: 'x',  rankDir: 'desc' },
+      { id: 'debt_to_equity',    label: 'Debt/Equity',       filter: 'Capital Structure Filter', operator: '<=', unit: '%',  rankDir: 'asc'  },
+      { id: 'price_to_book',     label: 'Price-to-Book',     filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x',  rankDir: 'asc'  },
+      { id: 'price_to_earnings', label: 'Price-to-Earnings', filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x',  rankDir: 'asc'  },
     ];
 
     /**
@@ -527,12 +525,13 @@
      * Operators and field definitions are inherited from FIELD_REGISTRY.
      * 'default' is used when no sector-specific config exists.
      */
+    // debt_to_equity thresholds are in Yahoo Finance % format (79.5 = 0.795x D/E ratio)
     const SECTOR_CONFIG = {
-      default:        { current_ratio: 2.0, ltd_to_nwc: 1.0, interest_coverage: 5.0,  price_to_book: 1.5, price_to_earnings: 15.0 },
-      'Real Estate':  { current_ratio: 1.2, ltd_to_nwc: 5.0, interest_coverage: 2.0,  price_to_book: 2.5, price_to_earnings: 25.0 },
-      'Retail':       { current_ratio: 1.5, ltd_to_nwc: 2.0, interest_coverage: 3.0,  price_to_book: 3.0, price_to_earnings: 20.0 },
-      'Technology':   { current_ratio: 1.5, ltd_to_nwc: 1.5, interest_coverage: 10.0, price_to_book: 5.0, price_to_earnings: 30.0 },
-      'Utilities':    { current_ratio: 1.0, ltd_to_nwc: 3.0, interest_coverage: 2.5,  price_to_book: 2.0, price_to_earnings: 20.0 },
+      default:        { current_ratio: 2.0, debt_to_equity: 150, price_to_book: 1.5, price_to_earnings: 15.0 },
+      'Real Estate':  { current_ratio: 1.2, debt_to_equity: 400, price_to_book: 2.5, price_to_earnings: 25.0 },
+      'Retail':       { current_ratio: 1.5, debt_to_equity: 250, price_to_book: 3.0, price_to_earnings: 20.0 },
+      'Technology':   { current_ratio: 1.5, debt_to_equity: 100, price_to_book: 5.0, price_to_earnings: 30.0 },
+      'Utilities':    { current_ratio: 1.0, debt_to_equity: 300, price_to_book: 2.0, price_to_earnings: 20.0 },
     };
 
     /**

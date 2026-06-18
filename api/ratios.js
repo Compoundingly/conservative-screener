@@ -1,85 +1,22 @@
 /**
- * api/ratios.js — Vercel Serverless Proxy (Alpha Vantage)
+ * api/ratios.js — Vercel Serverless Proxy (yahoo-finance2)
  *
- * Fetches three Alpha Vantage endpoints in parallel and returns the 5 observed
- * values consumed by FIELD_REGISTRY / SECTOR_CONFIG on the frontend.
+ * No API key required. yahoo-finance2 proxies public Yahoo Finance endpoints.
  *
- * Endpoint → fields used
+ * Modules used → fields extracted
  * ─────────────────────────────────────────────────────────────────────────────
- * OVERVIEW          → PERatio, PriceToBookRatio
- * BALANCE_SHEET     → totalCurrentAssets, totalCurrentLiabilities, longTermDebt
- *                     → computes current_ratio, ltd_to_nwc
- * INCOME_STATEMENT  → ebit, interestAndDebtExpense
- *                     → computes interest_coverage
+ * financialData      → currentRatio, debtToEquity (as %, e.g. 79.5 = 79.5% D/E)
+ * defaultKeyStatistics → priceToBook, forwardPE (fallback for P/E)
+ * summaryDetail      → trailingPE (preferred P/E)
  *
  * GET /api/ratios?ticker=AAPL
- *
- * Rate limits (Alpha Vantage free tier): 25 req/day · 5 req/min
- * Single-ticker lookup costs 3 requests — comfortably within free limits.
  */
 
-const AV_BASE = 'https://www.alphavantage.co/query';
+import YahooFinance from 'yahoo-finance2';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-/**
- * AV returns all numeric fields as strings. "None" means data unavailable.
- * Returns null for missing, "None", or NaN values.
- */
-function parseNum(val) {
-  if (val === null || val === undefined || val === 'None' || val === '-') return null;
-  const n = parseFloat(val);
-  return isNaN(n) ? null : n;
-}
-
-/**
- * Alpha Vantage sends rate-limit and key errors as HTTP 200 with a
- * Note or Information field instead of an error status code.
- */
-function assertNotRateLimited(data, fn) {
-  if (data?.Note) {
-    throw new Error(
-      `Alpha Vantage rate limit reached (${fn}). Free tier allows 25 requests/day and 5/min. ` +
-      'Wait a minute and try again, or upgrade your API plan.'
-    );
-  }
-  if (data?.Information) {
-    throw new Error(`Alpha Vantage API key issue (${fn}): ${data.Information}`);
-  }
-}
-
-/**
- * Derives the 5 observed values from parsed AV response objects.
- * Pure calculation — no fetching, no DOM, no side effects.
- */
-function computeObservedValues(overview, bs, is_) {
-  const tca  = parseNum(bs.totalCurrentAssets);
-  const tcl  = parseNum(bs.totalCurrentLiabilities);
-  const ltd  = parseNum(bs.longTermDebt);
-  const ebit = parseNum(is_.ebit);
-  // AV field name: interestAndDebtExpense; fall back to interestExpense
-  const intExp = parseNum(is_.interestAndDebtExpense) ?? parseNum(is_.interestExpense);
-
-  const currentRatio = (tca !== null && tcl !== null && tcl !== 0)
-    ? tca / tcl : null;
-
-  const nwc      = (tca !== null && tcl !== null) ? tca - tcl : null;
-  const ltdToNwc = (ltd !== null && nwc !== null && nwc !== 0)
-    ? ltd / nwc : null;
-
-  const interestCoverage = (ebit !== null && intExp !== null && intExp !== 0)
-    ? ebit / intExp : null;
-
-  return {
-    current_ratio:     currentRatio,
-    ltd_to_nwc:        ltdToNwc,
-    interest_coverage: interestCoverage,
-    price_to_book:     parseNum(overview.PriceToBookRatio),
-    price_to_earnings: parseNum(overview.PERatio),
-  };
-}
-
-// ── Handler ──────────────────────────────────────────────────────────────────
+const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
@@ -87,63 +24,46 @@ export default async function handler(req, res) {
   // ── Input validation ────────────────────────────────────────────────────────
   const { ticker } = req.query;
 
-  if (!ticker || !/^[A-Za-z]{1,5}$/.test(ticker)) {
+  if (!ticker || !/^[A-Za-z]{1,6}$/.test(ticker)) {
     return res.status(400).json({
-      error: 'Invalid ticker symbol. Use 1–5 letters (e.g. AAPL).',
+      error: 'Invalid ticker symbol. Use 1–6 letters (e.g. AAPL).',
     });
   }
 
   const symbol = ticker.toUpperCase();
 
-  // ── API key guard ───────────────────────────────────────────────────────────
-  const key = process.env.ALPHA_VANTAGE_API_KEY;
-
-  if (!key) {
-    return res.status(500).json({
-      error: 'Data provider API key is not configured. Contact the site administrator.',
-    });
-  }
-
-  // ── Sequential fetch (3 AV calls, 1 per second) ─────────────────────────────
-  // AV free tier enforces 1 request/second. Parallel calls trip the rate limiter
-  // and return an Information envelope instead of data.
-  const delay = ms => new Promise(r => setTimeout(r, ms));
-
-  let overview, balance, income;
+  // ── Fetch from Yahoo Finance ─────────────────────────────────────────────────
+  let result;
 
   try {
-    const avFetch = async fn => {
-      const r = await fetch(`${AV_BASE}?function=${fn}&symbol=${symbol}&apikey=${key}`);
-      if (!r.ok) throw new Error(`Data provider returned HTTP ${r.status} for ${fn}.`);
-      const d = await r.json();
-      assertNotRateLimited(d, fn);
-      return d;
-    };
-
-    overview = await avFetch('OVERVIEW');
-    await delay(1100);
-    balance  = await avFetch('BALANCE_SHEET');
-    await delay(1100);
-    income   = await avFetch('INCOME_STATEMENT');
+    result = await yahooFinance.quoteSummary(symbol, { modules: MODULES });
   } catch (err) {
-    const status = err.message.includes('rate limit') ? 429 : 502;
-    return res.status(status).json({ error: err.message });
+    // FailedYahooValidation still carries a partial result — use it
+    if (err.result) {
+      result = err.result;
+    } else {
+      const msg = err.message ?? '';
+      const status = msg.toLowerCase().includes('no fundamentals') ? 404 : 502;
+      return res.status(status).json({
+        error: status === 404
+          ? `No data found for "${symbol}". Verify the ticker symbol and try again.`
+          : `Data retrieval failed: ${msg}`,
+      });
+    }
   }
 
-  // ── Validate response ───────────────────────────────────────────────────────
-  if (!overview.Symbol) {
-    return res.status(404).json({
-      error: `No data found for "${symbol}". Verify the ticker symbol and try again.`,
-    });
-  }
-
-  // ── Extract, compute, return ────────────────────────────────────────────────
-  const bs  = balance.annualReports?.[0]  ?? {};
-  const is_ = income.annualReports?.[0]   ?? {};
+  const ks = result.defaultKeyStatistics ?? {};
+  const fd = result.financialData        ?? {};
+  const sd = result.summaryDetail        ?? {};
 
   return res.status(200).json({
-    ticker:           symbol,
-    fiscalDateEnding: bs.fiscalDateEnding ?? null,
-    observedValues:   computeObservedValues(overview, bs, is_),
+    ticker,
+    fiscalDateEnding: null,
+    observedValues: {
+      current_ratio:     fd.currentRatio  ?? null,
+      debt_to_equity:    fd.debtToEquity  ?? null,   // Yahoo Finance % format (79.5 = 0.795x D/E)
+      price_to_book:     ks.priceToBook   ?? null,
+      price_to_earnings: sd.trailingPE    ?? ks.forwardPE ?? null,
+    },
   });
 }
