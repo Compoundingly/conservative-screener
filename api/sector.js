@@ -191,9 +191,10 @@ async function fetchOneTicker(symbol) {
     debt_to_equity:    fd.debtToEquity   ?? null,
     price_to_book:     ks.priceToBook    ?? null,
     price_to_earnings: extractPE(ks, sd),
-    // Vitality Check inputs — decimal format (0.18 = 18%, 0.34 = 34%)
-    revenue_growth:    fd.revenueGrowth  ?? null,
-    return_on_equity:  fd.returnOnEquity ?? null,
+    // Structural Risk inputs — all decimal format
+    revenue_growth:    fd.revenueGrowth  ?? null,  // 0.18 = 18% TTM growth
+    return_on_equity:  fd.returnOnEquity ?? null,  // 0.34 = 34% TTM ROE
+    payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
   };
 }
 

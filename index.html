@@ -823,8 +823,60 @@
       return 'met';
     }
 
-    // Numeric score used for sorting (higher = stronger vitality)
+    // Numeric score used for sorting (higher = stronger vitality, used internally)
     const VITALITY_SCORE = { met: 2, unknown: 1, unmet: 0 };
+
+    // ── STRUCTURAL RISK ENGINE ───────────────────────────────────────────────────
+    /**
+     * Combines Vitality Check (growth + ROE) with Dividend Trap and Debt Load checks.
+     *
+     * Thresholds:
+     *   payoutRatio > 0.80  → Dividend Trap flag  (ignored if 0 or null = no dividend)
+     *   debtToEquity > 100  → Debt Load flag       (Yahoo Finance % format: 100 = 1.0x D/E)
+     *   debtToEquity < 0    → Debt Load flag       (negative equity = extreme leverage)
+     *
+     * Returns { level: 'clear'|'triggered'|'unknown', triggers: string[] }
+     * Pure function. No DOM access. No investment advice.
+     */
+    const STRUCTURAL_THRESHOLDS = { payoutRatio: 0.80, debtToEquity: 100 };
+
+    function calculateStructuralRisk(observedValues) {
+      const triggers = [];
+
+      // 1. Vitality (revenue growth + ROE)
+      if (calculateVitalityCheck(observedValues) === 'unmet') triggers.push('Vitality');
+
+      // 2. Dividend Trap: payout > 80% of earnings (skip if null/zero = no dividend)
+      const pr = observedValues.payout_ratio ?? null;
+      if (pr !== null && pr > 0 && pr > STRUCTURAL_THRESHOLDS.payoutRatio) triggers.push('Dividend');
+
+      // 3. Debt Load: D/E > 1.0× (> 100 in Yahoo Finance % format) or negative equity
+      const de = observedValues.debt_to_equity ?? null;
+      if (de !== null && (de > STRUCTURAL_THRESHOLDS.debtToEquity || de < 0)) triggers.push('Debt Load');
+
+      if (triggers.length > 0) return { level: 'triggered', triggers };
+
+      // No triggers — check if we have enough data to call it clear
+      const hasAnyData = [
+        observedValues.revenue_growth,
+        observedValues.return_on_equity,
+        pr,
+        de,
+      ].some(v => v !== null && v !== undefined);
+
+      return hasAnyData
+        ? { level: 'clear',   triggers: [] }
+        : { level: 'unknown', triggers: [] };
+    }
+
+    // Score for sorting: clear = 2, unknown = 1, triggered = 0
+    // Triggered with more flags sorts below triggered with fewer flags
+    function structuralRiskScore(observedValues) {
+      const { level, triggers } = calculateStructuralRisk(observedValues);
+      if (level === 'clear')     return 10;
+      if (level === 'unknown')   return 5;
+      return Math.max(0, 4 - triggers.length); // 1 flag = 3, 2 flags = 2, 3 flags = 1
+    }
 
     // ── RANKING ENGINE (pure — no DOM access) ────────────────────────────────────
     /**
@@ -859,9 +911,9 @@
             const vb = calcB.filter(r => r.passed === true).length;
             return dir === 'asc' ? va - vb : vb - va;
           }
-          if (sortById === 'vitality') {
-            const va = VITALITY_SCORE[calculateVitalityCheck(a.observedValues)] ?? 1;
-            const vb = VITALITY_SCORE[calculateVitalityCheck(b.observedValues)] ?? 1;
+          if (sortById === 'structural_risk') {
+            const va = structuralRiskScore(a.observedValues);
+            const vb = structuralRiskScore(b.observedValues);
             return dir === 'asc' ? va - vb : vb - va;
           }
           // Numeric ratio column — null always sinks to bottom
@@ -933,14 +985,21 @@
           return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
-        // Vitality Check cell
-        const vitality   = calculateVitalityCheck(company.observedValues);
-        const vitalityActive = 'vitality' === sortState.id;
-        const [vText, vCls] = vitality === 'met'
-          ? ['✓ Criteria Met',     vitalityActive ? 'text-sky-200' : 'text-sky-300']
-          : vitality === 'unmet'
-          ? ['✗ Criteria Unmet',   vitalityActive ? 'text-slate-300' : 'text-slate-500']
-          : ['— No Data',          'text-slate-700'];
+        // Structural Risk cell (Vitality + Dividend Trap + Debt Load)
+        const { level: srLevel, triggers: srTriggers } = calculateStructuralRisk(company.observedValues);
+        const srActive = 'structural_risk' === sortState.id;
+        let srText, srCls;
+        if (srLevel === 'clear') {
+          srText = '✓ No Triggers';
+          srCls  = srActive ? 'text-sky-200' : 'text-sky-300';
+        } else if (srLevel === 'triggered') {
+          const label = srTriggers.length > 1 ? `${srTriggers.join(', ')}` : srTriggers[0];
+          srText = `✗ ${label}`;
+          srCls  = srActive ? 'text-slate-300' : 'text-slate-500';
+        } else {
+          srText = '— No Data';
+          srCls  = 'text-slate-700';
+        }
 
         // Ticker cell uses font-sans so letter O is unambiguous from digit 0
         return `
@@ -952,7 +1011,7 @@
             <td class="px-4 py-3 text-sm font-semibold text-slate-200 w-20">${company.symbol}</td>
             ${cells}
             <td class="px-4 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-slate-200' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
-            <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${vCls}">${vText}</td>
+            <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${srCls}">${srText}</td>
           </tr>`;
       }).join('');
 
@@ -966,7 +1025,7 @@
                 <th scope="col" onclick="resortTable('symbol')" class="${thCls('symbol', 'w-20')}">Ticker${arrow('symbol')}</th>
                 ${colHeaders}
                 <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-center')}">Criteria Met${arrow('criteria_met')}</th>
-                <th scope="col" onclick="resortTable('vitality')" class="${thCls('vitality', 'text-center')}">Vitality Check${arrow('vitality')}</th>
+                <th scope="col" onclick="resortTable('structural_risk')" class="${thCls('structural_risk', 'text-center')}">Structural Risk${arrow('structural_risk')}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -990,7 +1049,7 @@
         _sortState.id  = colId;
         const field    = FIELD_REGISTRY.find(f => f.id === colId);
         _sortState.dir = colId === 'criteria_met' ? 'desc'
-                       : colId === 'vitality'     ? 'desc'
+                       : colId === 'structural_risk' ? 'desc'
                        : colId === 'companyName'  ? 'asc'
                        : colId === 'symbol'       ? 'asc'
                        : (field?.rankDir ?? 'asc');
