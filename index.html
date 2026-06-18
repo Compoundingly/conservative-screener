@@ -828,7 +828,7 @@
 
     // ── STRUCTURAL RISK ENGINE ───────────────────────────────────────────────────
     /**
-     * Combines Vitality Check (growth + ROE) with Dividend Trap and Debt Load checks.
+     * Combines Vitality (growth + ROE), Dividend Trap, Debt Load, and Coverage checks.
      *
      * Thresholds:
      *   payoutRatio > 0.80  → Dividend Trap flag  (ignored if 0 or null = no dividend)
@@ -838,7 +838,14 @@
      * Returns { level: 'clear'|'triggered'|'unknown', triggers: string[] }
      * Pure function. No DOM access. No investment advice.
      */
-    const STRUCTURAL_THRESHOLDS = { payoutRatio: 0.80, debtToEquity: 100 };
+    const STRUCTURAL_THRESHOLDS = {
+      payoutRatio:      0.80,  // > 80 % of earnings paid out → Dividend trigger
+      debtToEquity:     100,   // > 100 (Yahoo Finance % format, i.e. D/E > 1.0×) → Debt Load trigger
+      // EBITDA / (totalDebt × 5%) proxy; 3.0× = investment-grade credit-analyst floor.
+      // Traditional 5× is for direct interest expense data; this proxy uses EBITDA
+      // to give REITs/utilities a fair comparison despite high real-asset depreciation.
+      interestCoverage: 3.0,
+    };
 
     function calculateStructuralRisk(observedValues) {
       const triggers = [];
@@ -853,6 +860,12 @@
       // 3. Debt Load: D/E > 1.0× (> 100 in Yahoo Finance % format) or negative equity
       const de = observedValues.debt_to_equity ?? null;
       if (de !== null && (de > STRUCTURAL_THRESHOLDS.debtToEquity || de < 0)) triggers.push('Debt Load');
+
+      // 4. Coverage: operating income / implied interest expense < 5×
+      //    A null value means either no debt (auto-pass) or data unavailable (skip, benefit of the doubt).
+      //    Only flag when we have a positive computed value that falls below the threshold.
+      const ic = observedValues.interest_coverage ?? null;
+      if (ic !== null && ic < STRUCTURAL_THRESHOLDS.interestCoverage) triggers.push('Coverage');
 
       if (triggers.length > 0) return { level: 'triggered', triggers };
 
@@ -869,13 +882,12 @@
         : { level: 'unknown', triggers: [] };
     }
 
-    // Score for sorting: clear = 2, unknown = 1, triggered = 0
-    // Triggered with more flags sorts below triggered with fewer flags
+    // Score for sorting: clear = 10, unknown = 5, triggered sorts lower with more flags
     function structuralRiskScore(observedValues) {
       const { level, triggers } = calculateStructuralRisk(observedValues);
-      if (level === 'clear')     return 10;
-      if (level === 'unknown')   return 5;
-      return Math.max(0, 4 - triggers.length); // 1 flag = 3, 2 flags = 2, 3 flags = 1
+      if (level === 'clear')   return 10;
+      if (level === 'unknown') return 5;
+      return Math.max(0, 5 - triggers.length); // 1 flag=4, 2 flags=3, 3 flags=2, 4 flags=1
     }
 
     // ── RANKING ENGINE (pure — no DOM access) ────────────────────────────────────
@@ -985,7 +997,7 @@
           return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
-        // Structural Risk cell (Vitality + Dividend Trap + Debt Load)
+        // Structural Risk cell (Vitality + Dividend Trap + Debt Load + Coverage)
         const { level: srLevel, triggers: srTriggers } = calculateStructuralRisk(company.observedValues);
         const srActive = 'structural_risk' === sortState.id;
         let srText, srCls;

@@ -24,6 +24,38 @@ const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
+ * EBITDA-based interest coverage proxy.
+ *
+ * Direct interestExpense has been unavailable from Yahoo Finance since Nov 2024
+ * (income statement submodules were removed). This proxy computes:
+ *
+ *   impliedInterest = totalDebt × 0.05   (conservative 5 % assumed borrowing rate)
+ *   coverage        = ebitda / impliedInterest
+ *
+ * EBITDA is used (not operatingMargins × revenue) because depreciation on real
+ * assets heavily depresses GAAP operating income for capital-intensive sectors
+ * such as REITs, utilities and infrastructure — EBITDA gives a fair cross-sector
+ * comparison.  The threshold is 3.0× (investment-grade credit-analyst standard).
+ *
+ * Returns:
+ *   null           — no debt (not applicable; caller treats as pass)
+ *   null           — ebitda unavailable (unknown; benefit of the doubt)
+ *   0              — negative EBITDA (definitively fails)
+ *   positive float — computed EBITDA coverage ratio
+ */
+function computeInterestCoverage(fd) {
+  const totalDebt = fd.totalDebt ?? null;
+  if (totalDebt === null || totalDebt <= 0) return null; // no debt → no interest risk
+
+  const ebitda = fd.ebitda ?? null;
+  if (ebitda === null) return null; // insufficient data
+
+  if (ebitda <= 0) return 0; // negative EBITDA → fails any coverage threshold
+
+  return ebitda / (totalDebt * 0.05); // EBITDA / implied annual interest at 5%
+}
+
+/**
  * Robust P/E extraction.
  * Prefers trailing P/E; negative P/E (loss-making companies) is treated as
  * unusable data and falls back to forward P/E. Returns null if both are absent.
@@ -83,6 +115,7 @@ export default async function handler(req, res) {
       revenue_growth:    fd.revenueGrowth  ?? null,  // 0.18 = 18% TTM growth
       return_on_equity:  fd.returnOnEquity ?? null,  // 0.34 = 34% TTM ROE
       payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
+      interest_coverage: computeInterestCoverage(fd), // proxy: op.income / (totalDebt × 5%)
     },
   });
 }
