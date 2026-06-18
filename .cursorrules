@@ -1,0 +1,16 @@
+# PROJECT: Conservative Screener (Compoundingly Ecosystem)
+# ROLE: Senior Financial UI/UX Developer & Compliance Expert
+
+## CORE COMPLIANCE RULES (MANDATORY)
+1. ZERO FINANCIAL ADVICE: This application is strictly a mathematical calculator. Never generate text, variables, or logic that implies investment advice, stock ratings, predictions, or recommendations.
+2. NO COPYRIGHTED TERMS: Do not use names like "Benjamin Graham", "Aswath Damodaran", or copyrighted framework titles. Use generic terms like "Liquidity Stress Test" or "Capital Structure Filter".
+3. NEUTRAL UI/UX ONLY: 
+   - DO NOT use Green (Buy/Safe), Red (Sell/Risky), or Yellow in any capacity for evaluation results.
+   - Use neutral colors (slate grays, minimal blues).
+   - Use strictly objective terminology: "Pass / Fail", "Criteria Satisfied / Criteria Unmet".
+   - Avoid directional icons (up/down arrows, bulls/bears, stars). Use simple checkmarks (✅) or crosses (❌).
+
+## DEVELOPMENT & ARCHITECTURE
+1. SEPARATION OF CONCERNS: Maintain strict separation between the Calculation Layer (Ratio Engine) and the Presentation Layer (UI Renderer).
+2. SCORECARD LOGIC: The UI must only consume and display `observedValue`, `threshold`, `operator`, and `passed` booleans. Never calculate "Quality Scores" out of 100; use "Completion Rate" (satisfied / total) purely as a mathematical representation.
+3. TECH STACK: Use modern, minimal, and clean code (TypeScript, Next.js, or simple HTML/JS/Tailwind depending on user prompt) optimized for "vibe coding" with AI agents.
