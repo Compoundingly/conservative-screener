@@ -187,10 +187,13 @@ async function fetchOneTicker(symbol) {
   const sd = result.summaryDetail        ?? {};
 
   return {
-    current_ratio:     fd.currentRatio  ?? null,
-    debt_to_equity:    fd.debtToEquity  ?? null,
-    price_to_book:     ks.priceToBook   ?? null,
+    current_ratio:     fd.currentRatio   ?? null,
+    debt_to_equity:    fd.debtToEquity   ?? null,
+    price_to_book:     ks.priceToBook    ?? null,
     price_to_earnings: extractPE(ks, sd),
+    // Vitality Check inputs — decimal format (0.18 = 18%, 0.34 = 34%)
+    revenue_growth:    fd.revenueGrowth  ?? null,
+    return_on_equity:  fd.returnOnEquity ?? null,
   };
 }
 

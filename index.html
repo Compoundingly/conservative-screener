@@ -789,6 +789,43 @@
       return data;
     }
 
+    // ── VITALITY CHECK ENGINE ────────────────────────────────────────────────────
+    /**
+     * Evaluates top-line growth and capital efficiency against fixed thresholds.
+     *
+     * Thresholds (per user specification):
+     *   revenueGrowth  >= 0.02  (≥ 2% TTM revenue growth)
+     *   returnOnEquity >= 0.10  (≥ 10% TTM ROE)
+     *
+     * Returns:
+     *   'met'     — both criteria satisfied
+     *   'unmet'   — at least one criterion missed (or negative value)
+     *   'unknown' — insufficient data to evaluate
+     *
+     * Pure function. No DOM access. No investment advice.
+     */
+    const VITALITY_THRESHOLDS = { revenue_growth: 0.02, return_on_equity: 0.10 };
+
+    function calculateVitalityCheck(observedValues) {
+      const rg  = observedValues.revenue_growth  ?? null;
+      const roe = observedValues.return_on_equity ?? null;
+
+      // Both fields missing → unknown
+      if (rg === null && roe === null) return 'unknown';
+
+      // Any present field that fails immediately → unmet
+      if (rg  !== null && rg  < VITALITY_THRESHOLDS.revenue_growth)  return 'unmet';
+      if (roe !== null && roe < VITALITY_THRESHOLDS.return_on_equity) return 'unmet';
+
+      // Partial data where present field passes but the other is missing → unknown
+      if (rg === null || roe === null) return 'unknown';
+
+      return 'met';
+    }
+
+    // Numeric score used for sorting (higher = stronger vitality)
+    const VITALITY_SCORE = { met: 2, unknown: 1, unmet: 0 };
+
     // ── RANKING ENGINE (pure — no DOM access) ────────────────────────────────────
     /**
      * Sorts companies by sortById using an explicit direction.
@@ -820,6 +857,11 @@
             const calcB = activeConfig ? runCalculationLayer(b.observedValues, activeConfig) : [];
             const va = calcA.filter(r => r.passed === true).length;
             const vb = calcB.filter(r => r.passed === true).length;
+            return dir === 'asc' ? va - vb : vb - va;
+          }
+          if (sortById === 'vitality') {
+            const va = VITALITY_SCORE[calculateVitalityCheck(a.observedValues)] ?? 1;
+            const vb = VITALITY_SCORE[calculateVitalityCheck(b.observedValues)] ?? 1;
             return dir === 'asc' ? va - vb : vb - va;
           }
           // Numeric ratio column — null always sinks to bottom
@@ -891,6 +933,15 @@
           return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
+        // Vitality Check cell
+        const vitality   = calculateVitalityCheck(company.observedValues);
+        const vitalityActive = 'vitality' === sortState.id;
+        const [vText, vCls] = vitality === 'met'
+          ? ['✓ Criteria Met',     vitalityActive ? 'text-sky-200' : 'text-sky-300']
+          : vitality === 'unmet'
+          ? ['✗ Criteria Unmet',   vitalityActive ? 'text-slate-300' : 'text-slate-500']
+          : ['— No Data',          'text-slate-700'];
+
         // Ticker cell uses font-sans so letter O is unambiguous from digit 0
         return `
           <tr class="border-t border-slate-800/80 hover:bg-slate-800/30 transition-colors">
@@ -898,9 +949,10 @@
             <td class="px-4 py-3 text-sm text-slate-300 w-48">
               <div class="truncate max-w-[11rem]" title="${company.companyName}">${company.companyName}</div>
             </td>
-            <td class="px-4 py-3 text-sm font-semibold text-slate-200 w-20 ${'symbol' === sortState.id ? 'text-slate-200' : ''}">${company.symbol}</td>
+            <td class="px-4 py-3 text-sm font-semibold text-slate-200 w-20">${company.symbol}</td>
             ${cells}
             <td class="px-4 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-slate-200' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
+            <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${vCls}">${vText}</td>
           </tr>`;
       }).join('');
 
@@ -914,6 +966,7 @@
                 <th scope="col" onclick="resortTable('symbol')" class="${thCls('symbol', 'w-20')}">Ticker${arrow('symbol')}</th>
                 ${colHeaders}
                 <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-center')}">Criteria Met${arrow('criteria_met')}</th>
+                <th scope="col" onclick="resortTable('vitality')" class="${thCls('vitality', 'text-center')}">Vitality Check${arrow('vitality')}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -937,6 +990,7 @@
         _sortState.id  = colId;
         const field    = FIELD_REGISTRY.find(f => f.id === colId);
         _sortState.dir = colId === 'criteria_met' ? 'desc'
+                       : colId === 'vitality'     ? 'desc'
                        : colId === 'companyName'  ? 'asc'
                        : colId === 'symbol'       ? 'asc'
                        : (field?.rankDir ?? 'asc');
