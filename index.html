@@ -672,8 +672,8 @@
         benchmark:  'Trigger threshold: D/E > 100 (i.e. debt exceeds equity) or negative equity. Referencing Graham\'s 50 % capitalisation rule. Sector-specific D/E ceilings in SECTOR_CONFIG override the Structural Risk baseline.',
       },
       coverage: {
-        definition: 'EBITDA Coverage Proxy = EBITDA ÷ (Total Debt × 5 %). Approximates how many times operating cash earnings cover the annual interest burden at an assumed 5 % borrowing rate. Direct interest expense is unavailable from Yahoo Finance since Nov 2024.',
-        benchmark:  'Investment-grade credit floor: ≥ 3.0× EBITDA coverage. EBITDA is used (not GAAP operating income) so depreciation on real assets does not distort capital-intensive sector results. A null value (no debt or missing data) is treated as a pass by default.',
+        definition: 'Interest Coverage = EBITDA ÷ Interest Expense. Approximates how many times operating cash earnings cover the annual interest burden. Uses the directly reported interest expense from annual financial statements when available; falls back to an EBITDA-proxy (EBITDA ÷ Total Debt × 5 % assumed borrowing rate) for tickers where no direct interest-expense line is reported.',
+        benchmark:  'Investment-grade credit floor: ≥ 3.0× EBITDA coverage. EBITDA is used (not GAAP operating income) so depreciation on real assets does not distort capital-intensive sector results. A null value (no debt and no reported interest expense) is treated as a pass by default.',
       },
       ev_to_ebitda: {
         definition: 'Enterprise Value ÷ EBITDA. EV = Market Cap + Total Debt − Cash, representing the total acquisition cost of the business independent of capital structure. Dividing by EBITDA normalises for depreciation and financing choices, enabling cross-sector comparison of operating value.',

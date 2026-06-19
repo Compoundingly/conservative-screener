@@ -41,35 +41,40 @@ function extractPE(ks, sd) {
 }
 
 /**
- * EBITDA-based interest coverage proxy.
+ * Interest coverage: EBITDA ÷ interest expense.
  *
- * Direct interestExpense has been unavailable from Yahoo Finance since Nov 2024
- * (income statement submodules were removed). This proxy computes:
+ * Uses the real interest-expense figure from fundamentalsTimeSeries when reported
+ * (interestExpense, falling back to interestExpenseNonOperating — both accrual-basis,
+ * consistent with EBITDA). interestPaidSupplementalData (cash-paid basis) is
+ * intentionally excluded — mixing it with accrual-basis EBITDA would distort the ratio.
  *
- *   impliedInterest = totalDebt × 0.05   (conservative 5 % assumed borrowing rate)
- *   coverage        = ebitda / impliedInterest
- *
- * EBITDA is used (not operatingMargins × revenue) because depreciation on real
- * assets heavily depresses GAAP operating income for capital-intensive sectors
- * such as REITs, utilities and infrastructure — EBITDA gives a fair cross-sector
- * comparison.  The threshold is 3.0× (investment-grade credit-analyst standard).
+ * Falls back to the original EBITDA-proxy (ebitda / (totalDebt × 5% assumed borrowing
+ * rate)) for tickers where Yahoo reports no direct interest-expense line — confirmed
+ * absent for AAPL, consistent with the Nov 2024 income-statement-submodule deprecation
+ * that originally forced this proxy.
  *
  * Returns:
- *   null           — no debt (not applicable; caller treats as pass)
+ *   null           — no debt and no reported interest expense (not applicable)
  *   null           — ebitda unavailable (unknown; benefit of the doubt)
  *   0              — negative EBITDA (definitively fails)
- *   positive float — computed EBITDA coverage ratio
+ *   positive float — real or proxy coverage ratio
  */
-function computeInterestCoverage(fd) {
-  const totalDebt = fd.totalDebt ?? null;
-  if (totalDebt === null || totalDebt <= 0) return null; // no debt → no interest risk
-
+function computeInterestCoverage(fd, ts) {
   const ebitda = fd.ebitda ?? null;
   if (ebitda === null) return null; // insufficient data
 
-  if (ebitda <= 0) return 0; // negative EBITDA → fails any coverage threshold
+  const directInterest = ts?.interestExpense ?? ts?.interestExpenseNonOperating ?? null;
+  if (directInterest !== null && directInterest > 0) {
+    if (ebitda <= 0) return 0; // negative EBITDA → fails any coverage threshold
+    return ebitda / directInterest; // real figure — no assumed borrowing rate
+  }
 
-  return ebitda / (totalDebt * 0.05); // EBITDA / implied annual interest at 5%
+  // Fallback: EBITDA-proxy for tickers without a reported interest-expense line
+  const totalDebt = fd.totalDebt ?? null;
+  if (totalDebt === null || totalDebt <= 0) return null; // no debt → no interest risk
+
+  if (ebitda <= 0) return 0;
+  return ebitda / (totalDebt * 0.05);
 }
 
 /**
@@ -615,7 +620,7 @@ async function fetchOneTicker(symbol) {
     revenue_growth:    fd.revenueGrowth  ?? null,  // 0.18 = 18% TTM growth
     return_on_equity:  fd.returnOnEquity ?? null,  // 0.34 = 34% TTM ROE
     payout_ratio:      sd.payoutRatio    ?? null,  // 0.40 = 40% payout; null/0 = no dividend
-    interest_coverage: computeInterestCoverage(fd), // proxy: ebitda / (totalDebt × 5%)
+    interest_coverage: computeInterestCoverage(fd, timeSeries), // real interestExpense when reported; EBITDA-proxy fallback
     // Capital allocation efficiency (Mauboussin framework)
     roic:              computeROIC(fd),             // cash NOPAT / invested capital (decimal)
     wacc:              computeWACC(fd, ks),         // CAPM + after-tax cost of debt (decimal)
