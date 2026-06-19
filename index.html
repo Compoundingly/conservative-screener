@@ -625,7 +625,11 @@
       { id: 'ev_to_ebitda',      label: 'EV/EBITDA',         filter: 'Valuation Ratio Filter',    operator: '<=', unit: 'x',  rankDir: 'asc',  excludedSectors: ['Financials'] },
       // Companion check — validates that a low EV/EBITDA is not masking heavy capital
       // consumption. Stored pre-scaled ×100 to match debt_to_equity's % convention.
-      { id: 'reinvestment_rate', label: 'Reinvestment Rate', filter: 'Cash Reinvestment Test',    operator: '<=', unit: '%',  rankDir: 'asc',  excludedSectors: ['Financials'] },
+      // Excluded for Real Estate and Utilities: both sectors fund growth structurally
+      // through external capital (REITs must distribute ≥90% of taxable income; utilities
+      // are perpetually capital-intensive by regulatory design), so a NOPAT-based
+      // reinvestment ceiling doesn't measure what it's meant to for either sector.
+      { id: 'reinvestment_rate', label: 'Reinvestment Rate', filter: 'Cash Reinvestment Test',    operator: '<=', unit: '%',  rankDir: 'asc',  excludedSectors: ['Financials', 'Real Estate', 'Utilities'] },
     ];
 
     // ── TOOLTIP DEFINITIONS ───────────────────────────────────────────────────
@@ -677,7 +681,7 @@
       },
       reinvestment_rate: {
         definition: 'Net Reinvestment ÷ NOPAT, expressed as a percentage (pre-scaled ×100). Net Reinvestment = (CapEx − D&A) + ΔWorking Capital. NOPAT = EBIT × (1 − 21 % tax). Measures what fraction of after-tax operating profit is consumed by the business to sustain or grow its asset base. A rate below 50 % implies the firm generates more than half of NOPAT as distributable free cash flow.',
-        benchmark:  'Screening ceiling: ≤ 50 % across all included sectors (flat threshold, not sector-tiered). A reinvestment rate above 50 % signals heavy capital consumption relative to operating earnings — not necessarily negative, but warrants scrutiny alongside ROIC to confirm the incremental capital is being deployed above the cost of capital. Returns N/A when EBIT is non-positive or any required input is missing.',
+        benchmark:  'Screening ceiling: ≤ 50 % (flat threshold, not sector-tiered). Excluded for Real Estate and Utilities — both sectors structurally fund growth through external capital rather than retained operating earnings, so this ceiling does not apply. Excluded for Financials for the same reason as EV/EBITDA. A reinvestment rate above 50 % elsewhere signals heavy capital consumption relative to operating earnings — not necessarily negative, but warrants scrutiny alongside ROIC. Returns N/A when EBIT is non-positive or any required input is missing.',
       },
     };
 
@@ -773,8 +777,8 @@
       default:             { current_ratio: 2.0, debt_to_equity:  150, price_to_book: 1.5,  price_to_earnings: 15.0, ev_to_ebitda: 10.0, reinvestment_rate: 50 },
 
       // Sectors with real-asset backing — higher D/E and P/B are structurally normal
-      'Real Estate':       { current_ratio: 1.2, debt_to_equity:  400, price_to_book: 2.5,  price_to_earnings: 25.0, ev_to_ebitda: 16.5, reinvestment_rate: 50 },
-      'Utilities':         { current_ratio: 1.0, debt_to_equity:  300, price_to_book: 2.0,  price_to_earnings: 20.0, ev_to_ebitda: 13.5, reinvestment_rate: 50 },
+      'Real Estate':       { current_ratio: 1.2, debt_to_equity:  400, price_to_book: 2.5,  price_to_earnings: 25.0, ev_to_ebitda: 16.5 },
+      'Utilities':         { current_ratio: 1.0, debt_to_equity:  300, price_to_book: 2.0,  price_to_earnings: 20.0, ev_to_ebitda: 13.5 },
       'Energy':            { current_ratio: 1.2, debt_to_equity:  100, price_to_book: 2.0,  price_to_earnings: 15.0, ev_to_ebitda: 11.5, reinvestment_rate: 50 },
 
       // Consumer sectors — moderate leverage, some brand premium in P/B

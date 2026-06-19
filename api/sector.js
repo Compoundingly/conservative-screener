@@ -159,7 +159,7 @@ function computeWACC(fd, ks) {
  */
 function computeReinvestmentRate(ts) {
   if (!ts) return null;
-  const ebit     = ts.EBIT                       ?? null;
+  const ebit     = ts.ebit                       ?? null;
   const da       = ts.depreciationAndAmortization ?? null;
   const wcChange = ts.changeInWorkingCapital      ?? null;
   const capexRaw = ts.capitalExpenditure          ?? ts.purchaseOfInvestmentProperties ?? null;
