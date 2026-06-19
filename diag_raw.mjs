@@ -2,16 +2,27 @@
 import YahooFinance from 'yahoo-finance2';
 const yf = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-for (const symbol of ['AAPL', 'O']) { // O = capital-intensive REIT control case
+const FIELDS = [
+  'EBIT',
+  'freeCashFlow',
+  'operatingCashFlow',
+  'capitalExpenditure',
+  'depreciationAndAmortization',
+  'changeInWorkingCapital',
+];
+
+for (const symbol of ['AAPL', 'O']) {
   console.log(`\n=== ${symbol} ===`);
-  const ks = await yf.quoteSummary(symbol, { modules: ['defaultKeyStatistics'] });
-  console.log('enterpriseValue:', ks.defaultKeyStatistics?.enterpriseValue);
-  console.log('enterpriseToEbitda:', ks.defaultKeyStatistics?.enterpriseToEbitda);
 
   const ts = await yf.fundamentalsTimeSeries(symbol, {
     period1: '2023-01-01',
     type: 'annual',
     module: 'all',
   });
-  console.log('fundamentalsTimeSeries last period:', JSON.stringify(ts[ts.length - 1], null, 2));
+
+  const last = ts[ts.length - 1];
+  console.log('period:', last?.date);
+  for (const field of FIELDS) {
+    console.log(`  ${field}:`, last?.[field] ?? 'N/A');
+  }
 }
