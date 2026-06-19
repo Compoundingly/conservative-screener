@@ -32,6 +32,8 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 //                     defaultKeyStatistics.forwardPE (positive) → null
 const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
 
+const TAX = 0.21; // US corporate tax rate — shared by computeReinvestmentRate and computeROIC
+
 function extractPE(ks, sd) {
   const trailing = (sd?.trailingPE != null && sd.trailingPE > 0) ? sd.trailingPE : null;
   const forward  = (ks?.forwardPE  != null && ks.forwardPE  > 0) ? ks.forwardPE  : null;
@@ -110,7 +112,7 @@ function computeROIC(fd) {
   const investedCapital = equity + td - cash;
   if (investedCapital <= 0) return null;
 
-  return (ebitda * (1 - 0.21)) / investedCapital;  // decimal: 0.18 = 18%
+  return (ebitda * (1 - TAX)) / investedCapital;  // decimal: 0.18 = 18%
 }
 
 /**
@@ -126,7 +128,6 @@ function computeWACC(fd, ks) {
   const RF  = 0.045;
   const MRP = 0.055;
   const KD  = 0.05;
-  const TAX = 0.21;
 
   const rawBeta = ks.beta ?? null;
   const beta    = (rawBeta !== null && rawBeta > 0) ? rawBeta : 1.0;
@@ -141,6 +142,58 @@ function computeWACC(fd, ks) {
   const totalCapital = equity + td;
 
   return (equity / totalCapital) * ke + (td / totalCapital) * KD * (1 - TAX);
+}
+
+/**
+ * Reinvestment Rate = Net Reinvestment ÷ NOPAT, pre-scaled ×100 (e.g. 24.75 = 24.75 %).
+ *
+ * Net Reinvestment = (CapEx − D&A) + ΔWorking Capital
+ * NOPAT            = EBIT × (1 − TAX)
+ *
+ * capitalExpenditure and changeInWorkingCapital are signed cash-flow-effect values
+ * (negative = cash outflow) — confirmed via FCF = OCF + CapEx identity on live AAPL data.
+ * REITs report property purchases under purchaseOfInvestmentProperties instead of
+ * capitalExpenditure; that field's sign is unverified for live non-null REIT values.
+ *
+ * Returns null on any missing input or non-positive NOPAT.
+ */
+function computeReinvestmentRate(ts) {
+  if (!ts) return null;
+  const ebit     = ts.EBIT                       ?? null;
+  const da       = ts.depreciationAndAmortization ?? null;
+  const wcChange = ts.changeInWorkingCapital      ?? null;
+  const capexRaw = ts.capitalExpenditure          ?? ts.purchaseOfInvestmentProperties ?? null;
+
+  if (ebit === null || da === null || wcChange === null || capexRaw === null) return null;
+
+  const nopat = ebit * (1 - TAX);
+  if (nopat <= 0) return null;
+
+  const capexSpent      = -capexRaw;  // flip outflow-negative to positive magnitude
+  const wcConsumed      = -wcChange;  // flip cash-effect sign to positive magnitude consumed
+  const netReinvestment = (capexSpent - da) + wcConsumed;
+
+  return (netReinvestment / nopat) * 100;
+}
+
+/**
+ * Fetches the most recent annual fundamentalsTimeSeries period for a symbol.
+ * Returns the last period object, or null if unavailable.
+ */
+async function fetchTimeSeries(symbol) {
+  try {
+    const period1 = new Date();
+    period1.setFullYear(period1.getFullYear() - 2);
+    const ts = await yahooFinance.fundamentalsTimeSeries(symbol, {
+      period1,
+      type: 'annual',
+      module: 'all',
+    });
+    return ts?.length ? ts[ts.length - 1] : null;
+  } catch (err) {
+    console.warn(`[yf-ts] ${symbol}: ${err.message}`);
+    return null;
+  }
 }
 
 // ── Sector ticker registry ───────────────────────────────────────────────────
@@ -532,18 +585,22 @@ async function writeCache(cacheUrl, secret, key, payload) {
  * FailedYahooValidation errors are handled gracefully via err.result.
  */
 async function fetchOneTicker(symbol) {
-  let result;
+  const [qsOutcome, tsOutcome] = await Promise.allSettled([
+    yahooFinance.quoteSummary(symbol, { modules: MODULES }),
+    fetchTimeSeries(symbol),
+  ]);
 
-  try {
-    result = await yahooFinance.quoteSummary(symbol, { modules: MODULES });
-  } catch (err) {
-    if (err.result) {
-      result = err.result;
-    } else {
-      console.warn(`[yf] skipping ${symbol}: ${err.message}`);
-      return null;
-    }
+  let result;
+  if (qsOutcome.status === 'fulfilled') {
+    result = qsOutcome.value;
+  } else if (qsOutcome.reason?.result) {
+    result = qsOutcome.reason.result; // FailedYahooValidation — partial result usable
+  } else {
+    console.warn(`[yf] skipping ${symbol}: ${qsOutcome.reason?.message}`);
+    return null;
   }
+
+  const timeSeries = tsOutcome.status === 'fulfilled' ? tsOutcome.value : null;
 
   const ks = result.defaultKeyStatistics ?? {};
   const fd = result.financialData        ?? {};
@@ -562,6 +619,9 @@ async function fetchOneTicker(symbol) {
     // Capital allocation efficiency (Mauboussin framework)
     roic:              computeROIC(fd),             // cash NOPAT / invested capital (decimal)
     wacc:              computeWACC(fd, ks),         // CAPM + after-tax cost of debt (decimal)
+    // New: firm-level valuation and capital consumption
+    ev_to_ebitda:      ks.enterpriseToEbitda          ?? null,
+    reinvestment_rate: computeReinvestmentRate(timeSeries),
   };
 }
 

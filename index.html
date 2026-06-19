@@ -616,10 +616,16 @@
      *   rankDir   — 'asc' (lower is more conservative) | 'desc' (higher is more conservative)
      */
     const FIELD_REGISTRY = [
-      { id: 'current_ratio',     label: 'Current Ratio',     filter: 'Liquidity Stress Test',   operator: '>=', unit: 'x',  rankDir: 'desc' },
-      { id: 'debt_to_equity',    label: 'Debt/Equity',       filter: 'Capital Structure Filter', operator: '<=', unit: '%',  rankDir: 'asc'  },
-      { id: 'price_to_book',     label: 'Price-to-Book',     filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x',  rankDir: 'asc'  },
-      { id: 'price_to_earnings', label: 'Price-to-Earnings', filter: 'Valuation Ratio Filter',   operator: '<=', unit: 'x',  rankDir: 'asc'  },
+      { id: 'current_ratio',     label: 'Current Ratio',     filter: 'Liquidity Stress Test',    operator: '>=', unit: 'x',  rankDir: 'desc' },
+      { id: 'debt_to_equity',    label: 'Debt/Equity',       filter: 'Capital Structure Filter',  operator: '<=', unit: '%',  rankDir: 'asc'  },
+      { id: 'price_to_book',     label: 'Price-to-Book',     filter: 'Valuation Ratio Filter',    operator: '<=', unit: 'x',  rankDir: 'asc'  },
+      { id: 'price_to_earnings', label: 'Price-to-Earnings', filter: 'Valuation Ratio Filter',    operator: '<=', unit: 'x',  rankDir: 'asc'  },
+      // Firm-level valuation, capital-structure neutral. Excluded for Financials —
+      // EV/EBITDA is not coherent when debt is the product, not the capital structure.
+      { id: 'ev_to_ebitda',      label: 'EV/EBITDA',         filter: 'Valuation Ratio Filter',    operator: '<=', unit: 'x',  rankDir: 'asc',  excludedSectors: ['Financials'] },
+      // Companion check — validates that a low EV/EBITDA is not masking heavy capital
+      // consumption. Stored pre-scaled ×100 to match debt_to_equity's % convention.
+      { id: 'reinvestment_rate', label: 'Reinvestment Rate', filter: 'Cash Reinvestment Test',    operator: '<=', unit: '%',  rankDir: 'asc',  excludedSectors: ['Financials'] },
     ];
 
     // ── TOOLTIP DEFINITIONS ───────────────────────────────────────────────────
@@ -664,6 +670,14 @@
       coverage: {
         definition: 'EBITDA Coverage Proxy = EBITDA ÷ (Total Debt × 5 %). Approximates how many times operating cash earnings cover the annual interest burden at an assumed 5 % borrowing rate. Direct interest expense is unavailable from Yahoo Finance since Nov 2024.',
         benchmark:  'Investment-grade credit floor: ≥ 3.0× EBITDA coverage. EBITDA is used (not GAAP operating income) so depreciation on real assets does not distort capital-intensive sector results. A null value (no debt or missing data) is treated as a pass by default.',
+      },
+      ev_to_ebitda: {
+        definition: 'Enterprise Value ÷ EBITDA. EV = Market Cap + Total Debt − Cash, representing the total acquisition cost of the business independent of capital structure. Dividing by EBITDA normalises for depreciation and financing choices, enabling cross-sector comparison of operating value.',
+        benchmark:  'General ceiling: ≤ 10× for conservatively valued businesses. Sector-specific thresholds reflect structural norms: Technology ≤ 26.5×, Consumer Staples ≤ 23.5×, Healthcare ≤ 23.5×, Real Estate ≤ 16.5×, Retail ≤ 16.5×, Industrials ≤ 16.5×, Utilities ≤ 13.5×, Energy ≤ 11.5×. Excluded for Financials — EV/EBITDA is not a coherent concept when debt is the product rather than the capital structure.',
+      },
+      reinvestment_rate: {
+        definition: 'Net Reinvestment ÷ NOPAT, expressed as a percentage (pre-scaled ×100). Net Reinvestment = (CapEx − D&A) + ΔWorking Capital. NOPAT = EBIT × (1 − 21 % tax). Measures what fraction of after-tax operating profit is consumed by the business to sustain or grow its asset base. A rate below 50 % implies the firm generates more than half of NOPAT as distributable free cash flow.',
+        benchmark:  'Screening ceiling: ≤ 50 % across all included sectors (flat threshold, not sector-tiered). A reinvestment rate above 50 % signals heavy capital consumption relative to operating earnings — not necessarily negative, but warrants scrutiny alongside ROIC to confirm the incremental capital is being deployed above the cost of capital. Returns N/A when EBIT is non-positive or any required input is missing.',
       },
     };
 
@@ -748,27 +762,33 @@
      * Operators and field definitions are inherited from FIELD_REGISTRY.
      * 'default' is used when no sector-specific config exists.
      */
-    // debt_to_equity thresholds are in Yahoo Finance % format (100 = 1.0× D/E ratio)
+    // debt_to_equity thresholds are in Yahoo Finance % format (100 = 1.0× D/E ratio).
+    // ev_to_ebitda ceilings are extrapolated via proportional multiplier from the existing
+    // P/E and P/B overrides — validated against live data: Technology ceiling (26.5×) vs.
+    // AAPL actual (27.57×); Real Estate ceiling (16.5×) vs. O actual (17.20×) — both fail
+    // by a narrow margin, consistent with this screener's existing strictness.
+    // reinvestment_rate is flat at 50 (= 50 %, pre-scaled) across all included sectors.
     const SECTOR_CONFIG = {
       // Conservative base thresholds (Graham-style)
-      default:             { current_ratio: 2.0, debt_to_equity:  150, price_to_book: 1.5,  price_to_earnings: 15.0 },
+      default:             { current_ratio: 2.0, debt_to_equity:  150, price_to_book: 1.5,  price_to_earnings: 15.0, ev_to_ebitda: 10.0, reinvestment_rate: 50 },
 
       // Sectors with real-asset backing — higher D/E and P/B are structurally normal
-      'Real Estate':       { current_ratio: 1.2, debt_to_equity:  400, price_to_book: 2.5,  price_to_earnings: 25.0 },
-      'Utilities':         { current_ratio: 1.0, debt_to_equity:  300, price_to_book: 2.0,  price_to_earnings: 20.0 },
-      'Energy':            { current_ratio: 1.2, debt_to_equity:  100, price_to_book: 2.0,  price_to_earnings: 15.0 },
+      'Real Estate':       { current_ratio: 1.2, debt_to_equity:  400, price_to_book: 2.5,  price_to_earnings: 25.0, ev_to_ebitda: 16.5, reinvestment_rate: 50 },
+      'Utilities':         { current_ratio: 1.0, debt_to_equity:  300, price_to_book: 2.0,  price_to_earnings: 20.0, ev_to_ebitda: 13.5, reinvestment_rate: 50 },
+      'Energy':            { current_ratio: 1.2, debt_to_equity:  100, price_to_book: 2.0,  price_to_earnings: 15.0, ev_to_ebitda: 11.5, reinvestment_rate: 50 },
 
       // Consumer sectors — moderate leverage, some brand premium in P/B
-      'Retail':            { current_ratio: 1.5, debt_to_equity:  250, price_to_book: 3.0,  price_to_earnings: 20.0 },
-      'Consumer Staples':  { current_ratio: 1.2, debt_to_equity:  200, price_to_book: 5.0,  price_to_earnings: 20.0 },
+      'Retail':            { current_ratio: 1.5, debt_to_equity:  250, price_to_book: 3.0,  price_to_earnings: 20.0, ev_to_ebitda: 16.5, reinvestment_rate: 50 },
+      'Consumer Staples':  { current_ratio: 1.2, debt_to_equity:  200, price_to_book: 5.0,  price_to_earnings: 20.0, ev_to_ebitda: 23.5, reinvestment_rate: 50 },
 
       // Knowledge / IP sectors — lower leverage expected, premium P/B acceptable
-      'Technology':        { current_ratio: 1.5, debt_to_equity:  100, price_to_book: 5.0,  price_to_earnings: 30.0 },
-      'Healthcare':        { current_ratio: 1.5, debt_to_equity:  150, price_to_book: 5.0,  price_to_earnings: 20.0 },
-      'Industrials':       { current_ratio: 1.5, debt_to_equity:  150, price_to_book: 3.0,  price_to_earnings: 20.0 },
+      'Technology':        { current_ratio: 1.5, debt_to_equity:  100, price_to_book: 5.0,  price_to_earnings: 30.0, ev_to_ebitda: 26.5, reinvestment_rate: 50 },
+      'Healthcare':        { current_ratio: 1.5, debt_to_equity:  150, price_to_book: 5.0,  price_to_earnings: 20.0, ev_to_ebitda: 23.5, reinvestment_rate: 50 },
+      'Industrials':       { current_ratio: 1.5, debt_to_equity:  150, price_to_book: 3.0,  price_to_earnings: 20.0, ev_to_ebitda: 16.5, reinvestment_rate: 50 },
 
-      // Financials: D/E is structurally high for banks (deposits = liabilities).
-      // Threshold set very high to avoid false positives; P/B and P/E are the useful signals.
+      // Financials: no ev_to_ebitda / reinvestment_rate keys — excludedSectors in
+      // FIELD_REGISTRY filters these out before threshold lookup, so omission is safe.
+      // D/E is structurally high for banks (deposits = liabilities); P/B and P/E are primary.
       'Financials':        { current_ratio: 1.0, debt_to_equity: 1200, price_to_book: 2.0,  price_to_earnings: 15.0 },
     };
 
@@ -808,7 +828,9 @@
      */
     function getActiveConfig(sector, mosFraction) {
       const thresholds = SECTOR_CONFIG[sector] ?? SECTOR_CONFIG.default;
-      const base = FIELD_REGISTRY.map(f => ({ ...f, threshold: thresholds[f.id] }));
+      const base = FIELD_REGISTRY
+        .filter(f => !f.excludedSectors || !f.excludedSectors.includes(sector))
+        .map(f => ({ ...f, threshold: thresholds[f.id] }));
       return applyMoS(base, mosFraction ?? 0);
     }
 

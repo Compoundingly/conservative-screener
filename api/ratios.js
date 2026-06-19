@@ -21,6 +21,8 @@ const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
 
+const TAX = 0.21; // US corporate tax rate — shared by computeReinvestmentRate and computeROIC
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -98,7 +100,7 @@ function computeROIC(fd) {
   const investedCapital = equity + td - cash;
   if (investedCapital <= 0) return null;   // net-cash company or bad data
 
-  return (ebitda * (1 - 0.21)) / investedCapital;  // as decimal: 0.18 = 18% ROIC
+  return (ebitda * (1 - TAX)) / investedCapital;  // as decimal: 0.18 = 18% ROIC
 }
 
 /**
@@ -121,7 +123,6 @@ function computeWACC(fd, ks) {
   const RF  = 0.045;
   const MRP = 0.055;
   const KD  = 0.05;
-  const TAX = 0.21;
 
   const rawBeta = ks.beta ?? null;
   const beta    = (rawBeta !== null && rawBeta > 0) ? rawBeta : 1.0;
@@ -149,6 +150,58 @@ function extractPE(ks, sd) {
   return trailing ?? forward ?? null;
 }
 
+/**
+ * Reinvestment Rate = Net Reinvestment ÷ NOPAT, pre-scaled ×100 (e.g. 24.75 = 24.75 %).
+ *
+ * Net Reinvestment = (CapEx − D&A) + ΔWorking Capital
+ * NOPAT            = EBIT × (1 − TAX)
+ *
+ * capitalExpenditure and changeInWorkingCapital are signed cash-flow-effect values
+ * (negative = cash outflow) — confirmed via FCF = OCF + CapEx identity on live AAPL data.
+ * REITs report property purchases under purchaseOfInvestmentProperties instead of
+ * capitalExpenditure; that field's sign is unverified for live non-null REIT values.
+ *
+ * Returns null on any missing input or non-positive NOPAT.
+ */
+function computeReinvestmentRate(ts) {
+  if (!ts) return null;
+  const ebit     = ts.EBIT                       ?? null;
+  const da       = ts.depreciationAndAmortization ?? null;
+  const wcChange = ts.changeInWorkingCapital      ?? null;
+  const capexRaw = ts.capitalExpenditure          ?? ts.purchaseOfInvestmentProperties ?? null;
+
+  if (ebit === null || da === null || wcChange === null || capexRaw === null) return null;
+
+  const nopat = ebit * (1 - TAX);
+  if (nopat <= 0) return null;
+
+  const capexSpent     = -capexRaw;  // flip outflow-negative to positive magnitude
+  const wcConsumed     = -wcChange;  // flip cash-effect sign to positive magnitude consumed
+  const netReinvestment = (capexSpent - da) + wcConsumed;
+
+  return (netReinvestment / nopat) * 100;
+}
+
+/**
+ * Fetches the most recent annual fundamentalsTimeSeries period for a symbol.
+ * Returns the last period object, or null if unavailable.
+ */
+async function fetchTimeSeries(symbol) {
+  try {
+    const period1 = new Date();
+    period1.setFullYear(period1.getFullYear() - 2);
+    const ts = await yahooFinance.fundamentalsTimeSeries(symbol, {
+      period1,
+      type: 'annual',
+      module: 'all',
+    });
+    return ts?.length ? ts[ts.length - 1] : null;
+  } catch (err) {
+    console.warn(`[yf-ts] ${symbol}: ${err.message}`);
+    return null;
+  }
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -164,23 +217,27 @@ export default async function handler(req, res) {
 
   const symbol = ticker.toUpperCase();
 
-  let result;
+  const [qsOutcome, tsOutcome] = await Promise.allSettled([
+    yahooFinance.quoteSummary(symbol, { modules: MODULES }),
+    fetchTimeSeries(symbol),
+  ]);
 
-  try {
-    result = await yahooFinance.quoteSummary(symbol, { modules: MODULES });
-  } catch (err) {
-    if (err.result) {
-      result = err.result; // FailedYahooValidation — partial result is still usable
-    } else {
-      const msg = err.message ?? '';
-      const status = msg.toLowerCase().includes('no fundamentals') ? 404 : 502;
-      return res.status(status).json({
-        error: status === 404
-          ? `No data found for "${symbol}". Verify the ticker symbol and try again.`
-          : `Data retrieval failed: ${msg}`,
-      });
-    }
+  let result;
+  if (qsOutcome.status === 'fulfilled') {
+    result = qsOutcome.value;
+  } else if (qsOutcome.reason?.result) {
+    result = qsOutcome.reason.result; // FailedYahooValidation — partial result is still usable
+  } else {
+    const msg = qsOutcome.reason?.message ?? '';
+    const status = msg.toLowerCase().includes('no fundamentals') ? 404 : 502;
+    return res.status(status).json({
+      error: status === 404
+        ? `No data found for "${symbol}". Verify the ticker symbol and try again.`
+        : `Data retrieval failed: ${msg}`,
+    });
   }
+
+  const timeSeries = tsOutcome.status === 'fulfilled' ? tsOutcome.value : null;
 
   const ks = result.defaultKeyStatistics ?? {};
   const fd = result.financialData        ?? {};
@@ -202,6 +259,9 @@ export default async function handler(req, res) {
       // Capital allocation efficiency (Mauboussin framework)
       roic:              computeROIC(fd),             // cash NOPAT / invested capital (decimal)
       wacc:              computeWACC(fd, ks),         // CAPM + after-tax cost of debt (decimal)
+      // New: firm-level valuation and capital consumption
+      ev_to_ebitda:      ks.enterpriseToEbitda          ?? null,
+      reinvestment_rate: computeReinvestmentRate(timeSeries),
     },
   });
 }
