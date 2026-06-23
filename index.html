@@ -74,6 +74,35 @@
     }
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- ── Structured data ──────────────────────────────────────────────────── -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://compoundingly.com/#org",
+        "name": "Compoundingly",
+        "url": "https://compoundingly.com/",
+        "logo": "https://compoundingly.com/apple-touch-icon.png"
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://compoundingly.com/#app",
+        "name": "Conservative Screener",
+        "url": "https://compoundingly.com/",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires JavaScript.",
+        "publisher": { "@id": "https://compoundingly.com/#org" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "A quantitative screening tool that applies fixed mathematical thresholds to public financial data and reports objective pass/fail results. Not financial advice.",
+        "disclaimer": "This tool performs mathematical calculations only and does not constitute financial, investment, or trading advice."
+      }
+    ]
+  }
+  </script>
   <style>
     /* Subtle backdrop blur shimmer for the modal overlay */
     #disclaimer-overlay {
