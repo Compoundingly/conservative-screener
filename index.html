@@ -219,15 +219,28 @@
     }
 
     /* Global search dropdown */
+    #global-search-wrap { position: relative; }
     #global-search-results {
-      max-height: 280px;
+      max-height: 320px;
       overflow-y: auto;
+      background: rgba(15, 23, 42, 0.98);
+      border: 1px solid rgba(51, 65, 85, 0.85);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
     }
     #global-search-results::-webkit-scrollbar { width: 4px; }
     #global-search-results::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+    .search-result-item {
+      cursor: pointer;
+      transition: background-color 0.12s ease;
+    }
     .search-result-item:hover,
     .search-result-item[aria-selected="true"] {
-      background: rgba(51, 65, 85, 0.5);
+      background: rgba(51, 65, 85, 0.55);
+    }
+    .search-result-item[aria-selected="true"] {
+      box-shadow: inset 2px 0 0 #22d3ee;
     }
   </style>
 </head>
@@ -523,11 +536,11 @@
   <div id="main-dashboard" class="hidden min-h-screen flex flex-col">
 
     <!-- Top navigation bar -->
-    <header class="flex-shrink-0 border-b border-slate-800 bg-brand-900/95 backdrop-blur-sm sticky top-0 z-10">
-      <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+    <header class="flex-shrink-0 border-b border-slate-800 bg-brand-900/95 backdrop-blur-sm sticky top-0 z-20">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center gap-3 sm:gap-4">
 
         <!-- Left: Wordmark -->
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-2.5 flex-shrink-0">
           <div class="h-6 w-6 rounded bg-slate-700 flex items-center justify-center">
             <svg class="w-3.5 h-3.5 text-slate-300" viewBox="0 0 16 16" fill="none">
               <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.8"/>
@@ -541,16 +554,17 @@
           <span class="text-sm text-slate-500">Conservative Screener</span>
         </div>
 
-        <!-- Right: Global search + status badge -->
-        <div class="flex items-center gap-3 flex-1 justify-end max-w-xl">
-          <div class="relative flex-1 min-w-0 max-w-xs sm:max-w-sm">
+        <!-- Center/Right: Global search + status badge -->
+        <div class="flex items-center gap-2 sm:gap-3 flex-1 justify-end min-w-0">
+          <div id="global-search-wrap" class="relative flex-1 min-w-0 max-w-md">
+            <label for="global-search-input" class="sr-only">Search stocks by ticker or company name</label>
             <div class="relative">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/>
               </svg>
               <input
                 id="global-search-input"
-                type="text"
+                type="search"
                 role="combobox"
                 aria-expanded="false"
                 aria-controls="global-search-results"
@@ -567,10 +581,11 @@
             <div
               id="global-search-results"
               role="listbox"
-              class="hidden absolute top-full left-0 right-0 mt-1.5 bg-brand-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden"
+              aria-label="Search results"
+              class="hidden absolute top-full left-0 right-0 mt-1.5 rounded-lg z-50 overflow-hidden"
             ></div>
           </div>
-          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1 flex-shrink-0">
+          <span class="hidden md:inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1 flex-shrink-0">
             <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
             Informational Use Only
           </span>
@@ -2123,7 +2138,14 @@
             <td class="px-4 py-3 text-sm text-slate-400 w-48">
               <div class="truncate max-w-[11rem]" title="${company.companyName}">${company.companyName}</div>
             </td>
-            <td class="px-4 py-3 text-sm font-semibold font-mono text-slate-200 w-20 cursor-pointer hover:text-cyan-300 transition-colors" onclick="selectStockFromSearch('${company.symbol}')" title="View detailed analysis">${company.symbol}</td>
+            <td class="px-4 py-3 text-sm w-20">
+              <button
+                type="button"
+                class="font-semibold font-mono text-slate-200 hover:text-cyan-300 transition-colors cursor-pointer"
+                onclick="selectStockFromSearch('${company.symbol}')"
+                title="View detailed analysis for ${escapeHtml(company.symbol)}"
+              >${company.symbol}</button>
+            </td>
             ${cells}
             <td class="px-4 py-3 text-sm font-mono text-cyan-400 font-semibold text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-cyan-300' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
             <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${srCls}">${srText}</td>
@@ -2456,11 +2478,13 @@
     let searchDebounceTimer = null;
     let searchActiveIndex   = -1;
     let searchResults       = [];
+    let searchFetchId       = 0;
 
     function initGlobalSearch() {
+      const wrap    = document.getElementById('global-search-wrap');
       const input   = document.getElementById('global-search-input');
       const results = document.getElementById('global-search-results');
-      if (!input || !results) return;
+      if (!wrap || !input || !results) return;
 
       input.addEventListener('input', () => {
         clearTimeout(searchDebounceTimer);
@@ -2469,12 +2493,24 @@
           hideSearchResults();
           return;
         }
+        showSearchLoading();
         searchDebounceTimer = setTimeout(() => fetchSearchResults(q), 250);
+      });
+
+      input.addEventListener('focus', () => {
+        const q = input.value.trim();
+        if (q.length >= 1 && searchResults.length > 0) {
+          results.classList.remove('hidden');
+          input.setAttribute('aria-expanded', 'true');
+        }
       });
 
       input.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
+          if (results.classList.contains('hidden') && input.value.trim()) {
+            fetchSearchResults(input.value.trim());
+          }
           moveSearchSelection(1);
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
@@ -2483,55 +2519,84 @@
           e.preventDefault();
           if (searchActiveIndex >= 0 && searchResults[searchActiveIndex]) {
             selectStockFromSearch(searchResults[searchActiveIndex].symbol);
+          } else if (searchResults.length > 0) {
+            selectStockFromSearch(searchResults[0].symbol);
+          } else {
+            const q = input.value.trim().toUpperCase();
+            if (/^[A-Z]{1,6}$/.test(q)) selectStockFromSearch(q);
           }
         } else if (e.key === 'Escape') {
           hideSearchResults();
+          input.blur();
         }
       });
 
-      document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !results.contains(e.target)) {
-          hideSearchResults();
-        }
+      results.addEventListener('mousedown', (e) => {
+        const item = e.target.closest('.search-result-item');
+        if (!item) return;
+        e.preventDefault();
+        const idx = Number(item.dataset.index);
+        if (searchResults[idx]) selectStockFromSearch(searchResults[idx].symbol);
       });
+
+      document.addEventListener('click', (e) => {
+        if (!wrap.contains(e.target)) hideSearchResults();
+      });
+    }
+
+    function showSearchLoading() {
+      const input  = document.getElementById('global-search-input');
+      const listEl = document.getElementById('global-search-results');
+      if (!listEl) return;
+      listEl.innerHTML = `
+        <div class="px-4 py-3 text-sm text-slate-500 flex items-center gap-2">
+          <svg class="animate-spin w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+          </svg>
+          Searching…
+        </div>`;
+      listEl.classList.remove('hidden');
+      if (input) input.setAttribute('aria-expanded', 'true');
     }
 
     async function fetchSearchResults(q) {
       const input   = document.getElementById('global-search-input');
       const listEl  = document.getElementById('global-search-results');
+      const fetchId = ++searchFetchId;
 
       try {
         const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
         const data = await res.json();
+        if (fetchId !== searchFetchId) return;
         if (!res.ok) throw new Error(data.error || 'Search failed');
 
         searchResults     = data.results ?? [];
         searchActiveIndex = -1;
 
         if (searchResults.length === 0) {
-          listEl.innerHTML = `<div class="px-4 py-3 text-sm text-slate-500">No matches found</div>`;
+          listEl.innerHTML = `<div class="px-4 py-3 text-sm text-slate-500">No matches for “${escapeHtml(q)}”</div>`;
         } else {
           listEl.innerHTML = searchResults.map((item, i) => `
-            <button
-              type="button"
+            <div
               role="option"
               aria-selected="false"
               data-index="${i}"
-              class="search-result-item w-full text-left px-4 py-2.5 text-sm text-slate-300
-                     border-b border-slate-800/60 last:border-0 transition-colors"
-              onmousedown="event.preventDefault(); selectStockFromSearch('${item.symbol}')"
+              class="search-result-item w-full text-left px-4 py-2.5 text-sm
+                     border-b border-slate-800/60 last:border-0"
             >
               <span class="font-mono font-semibold text-slate-100">${escapeHtml(item.symbol)}</span>
-              <span class="text-slate-600 mx-1.5">—</span>
+              <span class="text-slate-600 mx-1.5" aria-hidden="true">—</span>
               <span class="text-slate-400">${escapeHtml(item.companyName)}</span>
-            </button>
+            </div>
           `).join('');
         }
 
         listEl.classList.remove('hidden');
         input.setAttribute('aria-expanded', 'true');
       } catch {
-        listEl.innerHTML = `<div class="px-4 py-3 text-sm text-slate-500">Search unavailable</div>`;
+        if (fetchId !== searchFetchId) return;
+        listEl.innerHTML = `<div class="px-4 py-3 text-sm text-slate-500">Search unavailable. Please try again.</div>`;
         listEl.classList.remove('hidden');
       }
     }
@@ -2557,17 +2622,27 @@
       if (input) input.setAttribute('aria-expanded', 'false');
       searchResults     = [];
       searchActiveIndex = -1;
+      searchFetchId++;
     }
 
+    /**
+     * Unified routing: closes search, switches to Single Ticker tab, runs analysis.
+     * Used by global search dropdown and sector scanner table tickers.
+     */
     function selectStockFromSearch(symbol) {
       const searchInput = document.getElementById('global-search-input');
       const tickerInput = document.getElementById('ticker-input');
+      const normalized  = String(symbol).trim().toUpperCase();
+
+      if (!/^[A-Z]{1,6}$/.test(normalized)) return;
 
       hideSearchResults();
       if (searchInput) searchInput.value = '';
 
       switchTab('ticker', { preserveContext: false });
-      if (tickerInput) tickerInput.value = symbol.toUpperCase();
+      if (tickerInput) tickerInput.value = normalized;
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       runScreener();
     }
   </script>
