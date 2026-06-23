@@ -251,6 +251,18 @@
     #beta-gate-card {
       box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
+
+    /* Sector combobox dropdown */
+    #sector-combobox-list {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    #sector-combobox-list::-webkit-scrollbar { width: 4px; }
+    #sector-combobox-list::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+    .sector-combobox-item { cursor: pointer; transition: background-color 0.12s ease; }
+    .sector-combobox-item[aria-selected="true"],
+    .sector-combobox-item:hover { background: rgba(30, 41, 59, 0.9); }
+    .sector-combobox-item.hidden-by-filter { display: none; }
   </style>
 </head>
 
@@ -776,27 +788,37 @@
         <div class="mb-8">
           <div class="flex flex-wrap items-end gap-3">
 
-            <!-- Sector dropdown -->
-            <div class="flex flex-col gap-1.5">
-              <label for="sector-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Sector</label>
-              <select
-                id="sector-select"
-                class="bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
-                       text-sm text-slate-200 font-medium
-                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
-                       transition-colors cursor-pointer"
-              >
-                <option value="Consumer Staples">Consumer Staples</option>
-                <option value="Energy">Energy</option>
-                <option value="Financials">Financials</option>
-                <option value="Healthcare">Healthcare</option>
-                <option value="Industrials">Industrials</option>
-                <option value="Real Estate">Real Estate</option>
-                <option value="Retail">Retail</option>
-                <option value="Technology">Technology</option>
-                <option value="Utilities">Utilities</option>
-                <option value="default">Broad Market</option>
-              </select>
+            <!-- Sector combobox -->
+            <div id="sector-combobox-wrap" class="relative flex flex-col gap-1.5 w-52 sm:w-56">
+              <label for="sector-combobox-input" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Sector</label>
+              <div class="relative">
+                <input
+                  id="sector-combobox-input"
+                  type="text"
+                  role="combobox"
+                  aria-expanded="false"
+                  aria-controls="sector-combobox-list"
+                  aria-autocomplete="list"
+                  autocomplete="off"
+                  spellcheck="false"
+                  value="Consumer Staples"
+                  class="w-full bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5 pr-9
+                         text-sm text-slate-200 font-medium
+                         focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                         transition-colors"
+                />
+                <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                </svg>
+                <ul
+                  id="sector-combobox-list"
+                  role="listbox"
+                  aria-label="Sector options"
+                  class="hidden absolute top-full left-0 right-0 mt-1.5 z-40
+                         bg-slate-900 border border-slate-800 rounded-lg shadow-xl overflow-hidden"
+                ></ul>
+              </div>
+              <input type="hidden" id="sector-select" value="Consumer Staples" />
             </div>
 
             <!-- Margin of Safety -->
@@ -1080,6 +1102,139 @@
       'Utilities':        'XLU',
       'default':          'SPY',
     };
+
+    const SECTOR_OPTIONS = [
+      { value: 'Consumer Staples', label: 'Consumer Staples' },
+      { value: 'Energy',           label: 'Energy' },
+      { value: 'Financials',       label: 'Financials' },
+      { value: 'Healthcare',       label: 'Healthcare' },
+      { value: 'Industrials',      label: 'Industrials' },
+      { value: 'Real Estate',      label: 'Real Estate' },
+      { value: 'Retail',           label: 'Retail' },
+      { value: 'Technology',       label: 'Technology' },
+      { value: 'Utilities',        label: 'Utilities' },
+      { value: 'default',          label: 'Broad Market' },
+    ];
+
+    let sectorComboboxOpen = false;
+
+    function initSectorCombobox() {
+      const wrap   = document.getElementById('sector-combobox-wrap');
+      const input  = document.getElementById('sector-combobox-input');
+      const list   = document.getElementById('sector-combobox-list');
+      const hidden = document.getElementById('sector-select');
+      if (!wrap || !input || !list || !hidden) return;
+
+      list.innerHTML = SECTOR_OPTIONS.map(opt => `
+        <li
+          role="option"
+          class="sector-combobox-item px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800"
+          data-value="${opt.value}"
+          data-label="${opt.label}"
+          aria-selected="${opt.value === hidden.value}"
+        >${opt.label}</li>
+      `).join('');
+
+      input.addEventListener('focus', () => {
+        openSectorCombobox();
+        filterSectorOptions(input.value);
+      });
+
+      input.addEventListener('input', () => {
+        if (!sectorComboboxOpen) openSectorCombobox();
+        filterSectorOptions(input.value);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeSectorCombobox(true);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const first = list.querySelector('.sector-combobox-item:not(.hidden-by-filter)');
+          if (first) selectSectorOption(first.dataset.value, first.dataset.label);
+        }
+      });
+
+      list.addEventListener('mousedown', (e) => {
+        const item = e.target.closest('.sector-combobox-item');
+        if (!item || item.classList.contains('hidden-by-filter')) return;
+        e.preventDefault();
+        selectSectorOption(item.dataset.value, item.dataset.label);
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!wrap.contains(e.target)) closeSectorCombobox(true);
+      });
+    }
+
+    function filterSectorOptions(query) {
+      const list = document.getElementById('sector-combobox-list');
+      if (!list) return;
+      const q = query.trim().toLowerCase();
+      let visibleCount = 0;
+
+      list.querySelectorAll('.sector-combobox-item').forEach(item => {
+        const label = (item.dataset.label || item.textContent || '').toLowerCase();
+        const match = !q || label.includes(q);
+        item.classList.toggle('hidden-by-filter', !match);
+        item.setAttribute('aria-hidden', String(!match));
+        if (match) visibleCount++;
+      });
+
+      if (visibleCount === 0) {
+        let empty = list.querySelector('.sector-combobox-empty');
+        if (!empty) {
+          empty = document.createElement('li');
+          empty.className = 'sector-combobox-empty px-4 py-3 text-sm text-slate-500 pointer-events-none';
+          empty.textContent = 'No matching sectors';
+          list.appendChild(empty);
+        }
+        empty.classList.remove('hidden-by-filter');
+      } else {
+        const empty = list.querySelector('.sector-combobox-empty');
+        if (empty) empty.classList.add('hidden-by-filter');
+      }
+    }
+
+    function openSectorCombobox() {
+      const input = document.getElementById('sector-combobox-input');
+      const list  = document.getElementById('sector-combobox-list');
+      if (!input || !list) return;
+      list.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+      sectorComboboxOpen = true;
+    }
+
+    function closeSectorCombobox(restoreLabel) {
+      const input  = document.getElementById('sector-combobox-input');
+      const list   = document.getElementById('sector-combobox-list');
+      const hidden = document.getElementById('sector-select');
+      if (!input || !list) return;
+
+      list.classList.add('hidden');
+      input.setAttribute('aria-expanded', 'false');
+      sectorComboboxOpen = false;
+
+      if (restoreLabel && hidden) {
+        const selected = SECTOR_OPTIONS.find(o => o.value === hidden.value);
+        if (selected) input.value = selected.label;
+      }
+    }
+
+    function selectSectorOption(value, label) {
+      const input  = document.getElementById('sector-combobox-input');
+      const hidden = document.getElementById('sector-select');
+      if (!input || !hidden) return;
+
+      hidden.value = value;
+      input.value  = label;
+
+      document.querySelectorAll('.sector-combobox-item').forEach(el => {
+        el.setAttribute('aria-selected', String(el.dataset.value === value));
+      });
+
+      closeSectorCombobox(false);
+    }
 
     /**
      * Tightens each threshold by the Margin of Safety fraction.
@@ -2416,6 +2571,7 @@
       }
 
       initGlobalSearch();
+      initSectorCombobox();
 
       if (!betaGranted) {
         const betaInput = document.getElementById('beta-code-input');
