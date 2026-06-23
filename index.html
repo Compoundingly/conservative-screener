@@ -929,8 +929,9 @@
                   autocomplete="off"
                   spellcheck="false"
                   value="Consumer Staples"
+                  placeholder="Search sectors (e.g. Technology)…"
                   class="w-full bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5 pr-9
-                         text-sm text-slate-200 font-medium
+                         text-sm text-slate-200 font-medium placeholder-slate-600
                          focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
                          transition-colors"
                 />
@@ -989,6 +990,28 @@
 
         <!-- Sector Macro Trend debug — temporary Vercel diagnostics (not wiped by table render) -->
         <div id="sector-trend-debug" class="mb-4"></div>
+
+        <!-- In-sector filter — revealed by renderSectorTable(), hidden on new scan -->
+        <div id="sector-filter-wrap" class="hidden mb-3">
+          <div class="relative max-w-xs">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none"
+                 viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/>
+            </svg>
+            <input
+              id="sector-filter-input"
+              type="search"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Filter by ticker or company…"
+              aria-label="Filter sector table by ticker or company name"
+              class="w-full bg-brand-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2
+                     text-sm text-slate-200 placeholder-slate-600
+                     focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40
+                     transition-colors"
+            />
+          </div>
+        </div>
 
         <!-- Sector results table — populated by renderSectorTable() -->
         <div id="sector-table-container">
@@ -1364,6 +1387,62 @@
       closeSectorCombobox(false);
     }
 
+    // ── IN-SECTOR TABLE FILTER ───────────────────────────────────────────────────
+    /**
+     * Instantly shows/hides <tr> rows in the rendered sector table based on
+     * whether the row's text content contains the query string.
+     * Matches against the full row text (ticker, company name, and numeric cells),
+     * so users can type 'AAPL', 'Apple', or even a ratio value like '12.5'.
+     * Pure DOM operation — no re-fetch, no re-rank, no state mutation.
+     */
+    function filterSectorTable(query) {
+      const tbody = document.querySelector('#sector-table-container tbody');
+      if (!tbody) return;
+
+      const q = query.trim().toLowerCase();
+      let visibleCount = 0;
+
+      Array.from(tbody.rows).forEach(row => {
+        const match = !q || row.textContent.toLowerCase().includes(q);
+        row.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+      });
+
+      // Surface a no-match message inside the existing container so layout stays intact
+      let emptyMsg = document.getElementById('sector-filter-empty');
+      if (visibleCount === 0 && q) {
+        if (!emptyMsg) {
+          emptyMsg = document.createElement('tr');
+          emptyMsg.id = 'sector-filter-empty';
+          emptyMsg.innerHTML = `<td colspan="99" class="px-6 py-8 text-center text-sm text-slate-500">
+            No results for <span class="font-mono text-slate-400">${q.toUpperCase()}</span> in this sector.
+          </td>`;
+          tbody.appendChild(emptyMsg);
+        }
+        emptyMsg.style.display = '';
+      } else if (emptyMsg) {
+        emptyMsg.style.display = 'none';
+      }
+    }
+
+    /**
+     * Attaches the input event listener to #sector-filter-input.
+     * Called once from the init IIFE; safe to call if the element is absent.
+     */
+    function initSectorFilter() {
+      const input = document.getElementById('sector-filter-input');
+      if (!input) return;
+      input.addEventListener('input', () => filterSectorTable(input.value));
+      // Clear filter on Escape
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          input.value = '';
+          filterSectorTable('');
+          input.blur();
+        }
+      });
+    }
+
     /**
      * Tightens each threshold by the Margin of Safety fraction.
      * Operators with upper bounds (<=) are reduced; lower bounds (>=) are raised.
@@ -1398,8 +1477,70 @@
 
     // ── DATA LAYER ──────────────────────────────────────────────────────────────
     /**
+     * ─────────────────────────────────────────────────────────────────────────
+     * INSTITUTIONAL DATA ARCHITECTURE — SEC EDGAR / XBRL INTEGRATION ROADMAP
+     * ─────────────────────────────────────────────────────────────────────────
+     *
+     * CURRENT STATE (v1 — Yahoo Finance proxy):
+     *   The Vercel serverless function at /api/ratios fetches pre-computed
+     *   ratio fields from a third-party data vendor (Yahoo Finance-compatible
+     *   endpoint). This is fast and zero-cost for prototyping, but introduces
+     *   vendor risk, inconsistent GAAP normalisation, and no audit trail.
+     *
+     * TARGET STATE (v2 — Primary-source XBRL pipeline):
+     *   Replace the vendor dependency with direct primary-source ingestion from
+     *   one of the two authoritative XBRL pipelines below.
+     *
+     *   ── Option A: SEC EDGAR XBRL REST API (free, official) ─────────────────
+     *   Endpoint:  https://data.sec.gov/api/xbrl/companyfacts/{CIK}.json
+     *   10-Q/10-K: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany
+     *              &CIK={TICKER}&type=10-Q&dateb=&owner=include&count=4
+     *   Fields:    us-gaap/Assets, Liabilities, StockholdersEquity,
+     *              Revenues, NetIncomeLoss, EarningsPerShareBasic,
+     *              LongTermDebt, CashAndCashEquivalentsAtCarryingValue,
+     *              CommonStockSharesOutstanding
+     *   Notes:     Rate-limited to 10 req/s. Requires CIK lookup via
+     *              /submissions/{CIK}.json. No pre-computed ratios —
+     *              all arithmetic must be done in the serverless function.
+     *              EDGAR data lags filings by ~48 h after EDGAR acceptance.
+     *
+     *   ── Option B: Financial Modeling Prep (FMP) API (paid, normalised) ─────
+     *   Endpoint:  https://financialmodelingprep.com/api/v3/
+     *   Useful routes:
+     *     /income-statement/{TICKER}?period=quarter&limit=4&apikey={KEY}
+     *     /balance-sheet-statement/{TICKER}?period=quarter&limit=4&apikey={KEY}
+     *     /cash-flow-statement/{TICKER}?period=quarter&limit=4&apikey={KEY}
+     *     /financial-ratios/{TICKER}?period=quarter&apikey={KEY}
+     *   Notes:     Pre-normalised GAAP mapping across 10-K/10-Q filings.
+     *              Handles fiscal year misalignment, TTM rolling windows,
+     *              and restatements automatically. Paid tier required for
+     *              real-time and bulk sector pulls. Best drop-in replacement
+     *              path — API shape maps cleanly onto observedValues keys.
+     *
+     *   ── Vercel serverless migration path (api/ratios.js) ───────────────────
+     *   1. Add env vars: FMP_API_KEY or EDGAR_USER_AGENT (SEC requires UA header)
+     *   2. In api/ratios.js:
+     *      a. Resolve ticker → CIK via SEC EDGAR /submissions endpoint (or FMP)
+     *      b. Fetch the latest 10-Q + 10-K XBRL facts for the target CIK
+     *      c. Extract raw GAAP line items from the XBRL fact array
+     *      d. Compute observedValues in-function using the same arithmetic
+     *         logic already documented in FIELD_REGISTRY / TOOLTIP_DEFINITIONS
+     *      e. Return the same { ticker, fiscalDateEnding, observedValues } shape
+     *         so zero changes are needed in the front-end calculation or
+     *         presentation layers.
+     *   3. Add a Redis/Upstash edge-cache layer (TTL 6 h) to avoid redundant
+     *      EDGAR polling and respect rate limits.
+     *
+     * ─────────────────────────────────────────────────────────────────────────
+     */
+
+    /**
      * Calls the Vercel serverless proxy at /api/ratios.
      * Returns { ticker, fiscalDateEnding, observedValues } or throws on error.
+     *
+     * v2 INTEGRATION POINT: swap the fetch URL to /api/ratios-edgar or
+     * /api/ratios-fmp once the XBRL pipeline (see architecture block above)
+     * is deployed. The response contract is identical.
      */
     async function fetchRatios(ticker) {
       const res = await fetch(`/api/ratios?ticker=${encodeURIComponent(ticker)}`);
@@ -2080,6 +2221,28 @@
     /**
      * Calls /api/sector. Returns { sector, cachedAt, companies[] } or throws.
      * Each company: { symbol, companyName, observedValues }
+     *
+     * v2 INTEGRATION POINT (bulk sector pull via FMP or SEC EDGAR):
+     *   The sector constituent list (array of tickers per sector) is currently
+     *   hardcoded in api/sector.js. In v2, this should be replaced with:
+     *
+     *   ── FMP /stock-screener endpoint ────────────────────────────────────────
+     *   GET https://financialmodelingprep.com/api/v3/stock-screener
+     *       ?sector={SECTOR}&exchange=NYSE,NASDAQ&limit=50&apikey={KEY}
+     *   Returns: [ { symbol, companyName, sector, industry, marketCap, ... } ]
+     *   Then pipe each symbol through the /api/ratios-fmp route described above.
+     *
+     *   ── SEC EDGAR SIC-code bulk pull ────────────────────────────────────────
+     *   Map GICS sector → SIC code ranges (e.g. Technology = 3570–3579, 7370–7379).
+     *   GET https://data.sec.gov/submissions/{CIK}.json for each CIK in SIC range.
+     *   This path is free but requires pre-built SIC→ticker mapping maintained
+     *   as a Vercel KV (edge) lookup table and refreshed quarterly.
+     *
+     *   ── Caching strategy ────────────────────────────────────────────────────
+     *   Sector bulk fetches are expensive (N tickers × 3 financial statement
+     *   requests each). Cache the full sector payload in Upstash Redis with a
+     *   6-hour TTL. The cachedAt field in the response is already surfaced in
+     *   the UI via the heading-date element.
      */
     async function fetchSector(sector) {
       const res  = await fetch(`/api/sector?sector=${encodeURIComponent(sector)}`);
@@ -2481,6 +2644,12 @@
         <p class="mt-3 text-xs text-slate-700 text-right">
           Rank is an arithmetic sort position only. ROIC is an approximation (EBITDA-based cash NOPAT; WACC via CAPM). Not financial advice.
         </p>`;
+
+      // Reveal the in-table filter and clear any previous query
+      const filterWrap  = document.getElementById('sector-filter-wrap');
+      const filterInput = document.getElementById('sector-filter-input');
+      if (filterWrap)  filterWrap.classList.remove('hidden');
+      if (filterInput) { filterInput.value = ''; filterSectorTable(''); }
     }
 
     /**
@@ -2545,6 +2714,12 @@
 
       scanBtn.disabled  = true;
       scanBtn.innerHTML = `<svg class="animate-spin inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 opacity-70" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Scanning…`;
+
+      // Hide the in-table filter while a new scan is in flight
+      const _filterWrap  = document.getElementById('sector-filter-wrap');
+      const _filterInput = document.getElementById('sector-filter-input');
+      if (_filterWrap)  _filterWrap.classList.add('hidden');
+      if (_filterInput) { _filterInput.value = ''; }
 
       const sectorLabel = sector === 'default' ? 'General' : sector;
       hideStockHeader();
@@ -2700,6 +2875,7 @@
 
       initGlobalSearch();
       initSectorCombobox();
+      initSectorFilter();
 
       if (!betaGranted) {
         const betaInput = document.getElementById('beta-code-input');
