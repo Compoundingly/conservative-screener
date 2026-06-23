@@ -146,6 +146,44 @@
     .fade-in {
       animation: fadeIn 0.35s ease-out forwards;
     }
+
+    /* Metric value / title hierarchy */
+    .metric-title { color: #9ca3af; } /* gray-400 */
+    .metric-value { color: #f8fafc; font-weight: 600; } /* white, semibold */
+    .metric-value-alt { color: #22d3ee; font-weight: 600; } /* cyan-400 */
+
+    /* Criteria status badges */
+    .badge-satisfied {
+      background: rgba(16, 185, 129, 0.18);
+      border-color: rgba(52, 211, 153, 0.35);
+      color: #6ee7b7;
+    }
+    .badge-unmet {
+      background: rgba(251, 113, 133, 0.18);
+      border-color: rgba(253, 164, 175, 0.35);
+      color: #fda4af;
+    }
+    .badge-neutral {
+      background: rgba(15, 23, 42, 1);
+      border-color: #334155;
+      color: #94a3b8;
+    }
+
+    /* Live price change — market data, not evaluation */
+    .price-up   { color: #34d399; }
+    .price-down { color: #fb7185; }
+
+    /* Global search dropdown */
+    #global-search-results {
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    #global-search-results::-webkit-scrollbar { width: 4px; }
+    #global-search-results::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+    .search-result-item:hover,
+    .search-result-item[aria-selected="true"] {
+      background: rgba(51, 65, 85, 0.5);
+    }
   </style>
 </head>
 
@@ -153,6 +191,100 @@
 
   <!-- ── Global tooltip panel (position:fixed, breaks out of overflow containers) ── -->
   <div id="cs-tooltip" role="tooltip" aria-hidden="true"></div>
+
+  <!-- =====================================================================
+       BETA ACCESS GATE
+       Shown before disclaimer until a valid beta code is entered.
+       ===================================================================== -->
+  <div
+    id="beta-gate-overlay"
+    class="fixed inset-0 z-[60] flex items-center justify-center bg-brand-900/95 px-4 py-6"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="beta-gate-title"
+  >
+    <div class="relative w-full max-w-md flex flex-col bg-brand-800 border border-slate-600/50 rounded-2xl shadow-2xl overflow-hidden">
+      <div class="px-8 pt-8 pb-6 border-b border-slate-700">
+        <div class="flex items-center gap-2.5 mb-4">
+          <div class="h-7 w-7 rounded-md bg-slate-600 flex items-center justify-center">
+            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.8"/>
+              <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
+              <rect x="9" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.3"/>
+            </svg>
+          </div>
+          <span class="text-sm font-semibold text-slate-300 tracking-wide uppercase">Compoundingly</span>
+        </div>
+        <h1 id="beta-gate-title" class="text-xl font-semibold text-slate-100">Private Beta Access</h1>
+        <p class="mt-2 text-sm text-slate-400 leading-relaxed">
+          This tool is currently in private beta. Enter your access code to continue, or join the waitlist below.
+        </p>
+      </div>
+
+      <div class="px-8 py-6 space-y-5">
+        <!-- Beta code form -->
+        <div>
+          <label for="beta-code-input" class="block text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Enter Beta Code</label>
+          <div class="flex gap-2">
+            <input
+              id="beta-code-input"
+              type="text"
+              autocomplete="off"
+              placeholder="Access code"
+              onkeydown="if(event.key==='Enter') submitBetaCode()"
+              class="flex-1 bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                     text-sm font-mono text-slate-200 placeholder-slate-600 uppercase
+                     focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40"
+            />
+            <button
+              id="beta-submit-btn"
+              onclick="submitBetaCode()"
+              class="flex-shrink-0 px-5 py-2.5 rounded-lg text-sm font-semibold
+                     bg-slate-600 text-slate-100 border border-slate-500
+                     hover:bg-slate-500 transition-all duration-150"
+            >Enter</button>
+          </div>
+          <p id="beta-error" class="hidden mt-2 text-xs text-rose-400/90"></p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex-1 h-px bg-slate-700"></div>
+          <span class="text-xs text-slate-600 uppercase tracking-widest">or</span>
+          <div class="flex-1 h-px bg-slate-700"></div>
+        </div>
+
+        <!-- Waitlist form -->
+        <div>
+          <label for="waitlist-email" class="block text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Join the Waitlist</label>
+          <div class="flex gap-2">
+            <input
+              id="waitlist-email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              onkeydown="if(event.key==='Enter') submitWaitlist()"
+              class="flex-1 bg-brand-900 border border-slate-700 rounded-lg px-4 py-2.5
+                     text-sm text-slate-200 placeholder-slate-600
+                     focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40"
+            />
+            <button
+              id="waitlist-submit-btn"
+              onclick="submitWaitlist()"
+              class="flex-shrink-0 px-5 py-2.5 rounded-lg text-sm font-semibold
+                     bg-brand-900 text-slate-300 border border-slate-600
+                     hover:border-slate-500 hover:text-slate-200 transition-all duration-150"
+            >Join</button>
+          </div>
+          <p id="waitlist-message" class="hidden mt-2 text-xs"></p>
+        </div>
+      </div>
+
+      <div class="px-8 py-4 border-t border-slate-700 bg-brand-800/80">
+        <p class="text-center text-xs text-slate-600">Informational tool only. Not financial advice.</p>
+      </div>
+    </div>
+  </div>
 
   <!-- =====================================================================
        LEGAL DISCLAIMER MODAL
@@ -364,9 +496,36 @@
           <span class="text-sm text-slate-500">Conservative Screener</span>
         </div>
 
-        <!-- Right: Status badge -->
-        <div class="flex items-center gap-3">
-          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1">
+        <!-- Right: Global search + status badge -->
+        <div class="flex items-center gap-3 flex-1 justify-end max-w-xl">
+          <div class="relative flex-1 min-w-0 max-w-xs sm:max-w-sm">
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/>
+              </svg>
+              <input
+                id="global-search-input"
+                type="text"
+                role="combobox"
+                aria-expanded="false"
+                aria-controls="global-search-results"
+                aria-autocomplete="list"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                placeholder="Search ticker or company…"
+                class="w-full bg-brand-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2
+                       text-sm text-slate-200 placeholder-slate-600
+                       focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500/40"
+              />
+            </div>
+            <div
+              id="global-search-results"
+              role="listbox"
+              class="hidden absolute top-full left-0 right-0 mt-1.5 bg-brand-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden"
+            ></div>
+          </div>
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-full px-3 py-1 flex-shrink-0">
             <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
             Informational Use Only
           </span>
@@ -381,7 +540,16 @@
       <div class="mb-6 fade-in">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
-          <span id="heading-context" class="hidden font-mono text-lg text-slate-400"></span>
+        </div>
+        <!-- Stock detail header — populated by renderDashboard() -->
+        <div id="stock-header" class="hidden mt-4 mb-1">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 id="stock-title" class="text-3xl sm:text-4xl font-bold text-slate-50 tracking-tight font-mono"></h3>
+          </div>
+          <div id="stock-price-row" class="hidden mt-2 flex items-baseline gap-3">
+            <span id="stock-price" class="text-2xl sm:text-3xl font-semibold font-mono text-slate-100"></span>
+            <span id="stock-change" class="text-lg font-semibold font-mono"></span>
+          </div>
         </div>
         <p class="mt-1.5 text-sm text-slate-500 max-w-xl">
           Apply mathematical threshold criteria to publicly available financial data.
@@ -905,10 +1073,65 @@
       return unit ? `${str}${unit}` : str;
     }
 
-    function renderDashboard(results, ticker, fiscalDate, observedValues) {
-      const tickerEl = document.getElementById('heading-context');
-      tickerEl.textContent = `— ${ticker}`;
-      tickerEl.classList.remove('hidden');
+    function criteriaBadgeClass(statusLabel) {
+      if (statusLabel === 'Criteria Satisfied') return 'badge-satisfied';
+      if (statusLabel === 'Criteria Unmet')     return 'badge-unmet';
+      return 'badge-neutral';
+    }
+
+    function formatPrice(price) {
+      if (price === null || price === undefined) return null;
+      return '$' + Number(price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatChangePercent(pct) {
+      if (pct === null || pct === undefined) return null;
+      const sign = pct >= 0 ? '+' : '';
+      return sign + Number(pct).toFixed(2) + '%';
+    }
+
+    function renderStockHeader(ticker, companyName, currentPrice, changePercent) {
+      const headerEl = document.getElementById('stock-header');
+      const titleEl  = document.getElementById('stock-title');
+      const priceRow = document.getElementById('stock-price-row');
+      const priceEl  = document.getElementById('stock-price');
+      const changeEl = document.getElementById('stock-change');
+
+      if (!headerEl || !titleEl) return;
+
+      const namePart = companyName ? ` — ${companyName}` : '';
+      titleEl.textContent = `${ticker}${namePart}`;
+      headerEl.classList.remove('hidden');
+
+      if (currentPrice !== null && currentPrice !== undefined) {
+        priceEl.textContent = formatPrice(currentPrice);
+        priceRow.classList.remove('hidden');
+
+        if (changePercent !== null && changePercent !== undefined) {
+          const isUp = changePercent >= 0;
+          changeEl.textContent = formatChangePercent(changePercent);
+          changeEl.className = 'text-lg font-semibold font-mono ' + (isUp ? 'price-up' : 'price-down');
+        } else {
+          changeEl.textContent = '';
+          changeEl.className = '';
+        }
+      } else {
+        priceRow.classList.add('hidden');
+      }
+    }
+
+    function hideStockHeader() {
+      const headerEl = document.getElementById('stock-header');
+      if (headerEl) headerEl.classList.add('hidden');
+    }
+
+    function renderDashboard(results, ticker, fiscalDate, observedValues, meta = {}) {
+      renderStockHeader(
+        ticker,
+        meta.companyName ?? null,
+        meta.currentPrice ?? null,
+        meta.changePercent ?? null
+      );
 
       if (fiscalDate) {
         const dateEl = document.getElementById('heading-date');
@@ -937,14 +1160,14 @@
           const divider   = idx < items.length - 1
             ? `<div class="w-full h-px bg-slate-700/50"></div>`
             : '';
-          const valCls = item.passed === true  ? 'text-sky-300'
-                       : item.passed === false ? 'text-slate-500'
-                       : 'text-slate-700';
+          const valCls = item.observedValue === null || item.observedValue === undefined
+            ? 'text-slate-600'
+            : 'metric-value-alt';
           const hasTip = item.id in TOOLTIP_DEFINITIONS;
           return `
             <div class="flex justify-between items-center text-sm">
-              <span class="text-slate-400${hasTip ? ' cursor-help' : ''}"${hasTip ? ` data-tooltip-key="${item.id}"` : ''}>${item.label}${hasTip ? '<span class="tip-dot">ⓘ</span>' : ''}</span>
-              <span class="font-mono ${valCls}">${observed} <span class="text-slate-600">${threshold}</span></span>
+              <span class="metric-title text-sm${hasTip ? ' cursor-help' : ''}"${hasTip ? ` data-tooltip-key="${item.id}"` : ''}>${item.label}${hasTip ? '<span class="tip-dot">ⓘ</span>' : ''}</span>
+              <span class="font-mono ${valCls}">${observed} <span class="text-slate-600 font-normal">${threshold}</span></span>
             </div>${divider}`;
         }).join('');
 
@@ -952,7 +1175,7 @@
           <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">${groupName}</span>
-              <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-400">${statusLabel}</span>
+              <span class="text-xs font-mono border rounded px-2 py-0.5 ${criteriaBadgeClass(statusLabel)}">${statusLabel}</span>
             </div>
             <div class="space-y-2">${rows}</div>
             <div class="pt-1 text-xs text-slate-500">${satisfied} / ${total} criteria met</div>
@@ -1026,19 +1249,19 @@
         );
 
         const { level: srLevel, triggers: srTriggers } = calculateStructuralRisk(ov);
-        const srBadgeCls = srLevel === 'clear'     ? 'text-sky-300'
-                         : srLevel === 'triggered' ? 'text-slate-500'
-                         : 'text-slate-600';
-        const srBadge    = srLevel === 'clear'     ? '✓ No Triggers'
-                         : srLevel === 'triggered' ? `✗ ${srTriggers.join(', ')}`
-                         : '— Insufficient Data';
+        const srBadgeLabel = srLevel === 'clear'     ? '✓ No Triggers'
+                           : srLevel === 'triggered' ? `✗ ${srTriggers.join(', ')}`
+                           : '— Insufficient Data';
+        const srBadgeCls   = srLevel === 'clear'     ? 'badge-satisfied'
+                           : srLevel === 'triggered' ? 'badge-unmet'
+                           : 'badge-neutral';
         const triggerCount = srTriggers.length;
 
         structuralRiskCard = `
           <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Structural Risk</span>
-              <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 ${srBadgeCls}">${srBadge}</span>
+              <span class="text-xs font-mono border rounded px-2 py-0.5 ${srBadgeCls}">${srBadgeLabel}</span>
             </div>
             <div class="space-y-2">
               ${vitRow}
@@ -1067,31 +1290,31 @@
           const roicPct     = (roic * 100).toFixed(1);
           const waccPct     = (wacc * 100).toFixed(1);
           const spreadPct   = (Math.abs(spread) * 100).toFixed(1);
-          const badgeCls    = aboveWacc ? 'text-sky-300' : 'text-slate-500';
+          const badgeCls    = aboveWacc ? 'badge-satisfied' : 'badge-unmet';
           const badgeLabel  = aboveWacc
             ? `✓ ROIC > WACC (+${spreadPct} pp)`
             : `✗ ROIC < WACC (−${spreadPct} pp)`;
-          const roicCls     = aboveWacc ? 'text-sky-300' : 'text-slate-500';
+          const roicCls     = 'metric-value-alt';
 
           capitalCard = `
             <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold uppercase tracking-widest text-slate-500" data-tooltip-key="roic">Capital Efficiency<span class="tip-dot">ⓘ</span></span>
-                <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 ${badgeCls}">${badgeLabel}</span>
+                <span class="text-xs font-mono border rounded px-2 py-0.5 ${badgeCls}">${badgeLabel}</span>
               </div>
               <div class="space-y-2">
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">Cash ROIC (approx.)</span>
+                  <span class="metric-title">Cash ROIC (approx.)</span>
                   <span class="font-mono ${roicCls}">${roicPct}%</span>
                 </div>
                 <div class="w-full h-px bg-slate-700/50"></div>
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">WACC (approx.)</span>
-                  <span class="font-mono text-slate-400">${waccPct}%</span>
+                  <span class="metric-title">WACC (approx.)</span>
+                  <span class="font-mono metric-value">${waccPct}%</span>
                 </div>
                 <div class="w-full h-px bg-slate-700/50"></div>
                 <div class="flex justify-between items-center text-sm">
-                  <span class="text-slate-400">Spread vs WACC</span>
+                  <span class="metric-title">Spread vs WACC</span>
                   <span class="font-mono ${roicCls}">${spreadSign}${spreadPct} pp</span>
                 </div>
               </div>
@@ -1135,15 +1358,13 @@
      */
     function buildSRRow(label, description, status, detail, tooltipKey) {
       const icon    = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '—';
-      const valCls  = status === 'pass'    ? 'text-sky-300'
-                    : status === 'fail'    ? 'text-slate-500'
-                    : 'text-slate-700';
+      const valCls  = status === 'unknown' ? 'text-slate-600' : 'metric-value-alt';
       const tipAttr = tooltipKey ? ` data-tooltip-key="${tooltipKey}"` : '';
       const tipDot  = tooltipKey ? '<span class="tip-dot">ⓘ</span>' : '';
       return `
         <div class="flex justify-between items-start text-sm gap-3">
           <div>
-            <span class="text-slate-400 cursor-help"${tipAttr}>${label}${tipDot}</span>
+            <span class="metric-title cursor-help"${tipAttr}>${label}${tipDot}</span>
             <span class="block text-xs text-slate-600 mt-0.5">${description}</span>
           </div>
           <span class="font-mono whitespace-nowrap ${valCls} flex-shrink-0">${icon} ${detail}</span>
@@ -1376,7 +1597,7 @@
       runBtn.disabled   = true;
       runBtn.innerHTML  = `<svg class="animate-spin inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 opacity-70" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Fetching…`;
       document.getElementById('completion-summary').classList.add('hidden');
-      document.getElementById('heading-context').classList.add('hidden');
+      hideStockHeader();
       document.getElementById('heading-date').classList.add('hidden');
       // Hide the insights toggle and panel when starting a fresh fetch
       document.getElementById('insights-toggle-row').classList.add('hidden');
@@ -1394,7 +1615,11 @@
       try {
         const data    = await fetchRatios(ticker);
         const results = runCalculationLayer(data.observedValues, getActiveConfig('default'));
-        renderDashboard(results, ticker, data.fiscalDateEnding, data.observedValues);
+        renderDashboard(results, ticker, data.fiscalDateEnding, data.observedValues, {
+          companyName:   data.companyName,
+          currentPrice:  data.currentPrice,
+          changePercent: data.changePercent,
+        });
       } catch (err) {
         container.innerHTML = `
           <div class="col-span-full bg-brand-800 border border-slate-700/60 rounded-xl p-6 text-center">
@@ -1407,7 +1632,7 @@
     }
 
     // ── TAB SWITCHER ─────────────────────────────────────────────────────────────
-    function switchTab(tab) {
+    function switchTab(tab, opts = {}) {
       const isTickerTab = tab === 'ticker';
 
       document.getElementById('panel-ticker').classList.toggle('hidden', !isTickerTab);
@@ -1426,11 +1651,10 @@
       setTabActive(document.getElementById('tab-ticker'), isTickerTab);
       setTabActive(document.getElementById('tab-sector'), !isTickerTab);
 
-      // Reset heading context on tab switch
-      const ctxEl = document.getElementById('heading-context');
-      ctxEl.classList.add('hidden');
-      ctxEl.textContent = '';
-      document.getElementById('heading-date').classList.add('hidden');
+      if (!opts.preserveContext) {
+        hideStockHeader();
+        document.getElementById('heading-date').classList.add('hidden');
+      }
     }
 
     // ── SECTOR DATA LAYER ────────────────────────────────────────────────────────
@@ -1760,12 +1984,8 @@
           const valStr    = formatValue(rawVal, f.unit);
           const isActive  = f.id === sortState.id;
           const criterion = calcResults.find(r => r.id === f.id);
-          // Compliant color scheme per .cursorrules (no green/red):
-          // sky-300 = criteria satisfied  |  slate-500 = criteria unmet  |  slate-700 = no data
-          const textCls = isNull                       ? 'text-slate-700'
-                        : criterion?.passed === true   ? (isActive ? 'text-sky-200'   : 'text-sky-300')
-                        : criterion?.passed === false  ? (isActive ? 'text-slate-300' : 'text-slate-500')
-                        : 'text-slate-400';
+          // Bright cyan values for legibility; N/A stays dim
+          const textCls = isNull ? 'text-slate-600' : 'metric-value-alt';
           return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
@@ -1812,10 +2032,10 @@
         return `
           <tr class="border-t border-slate-800/80 hover:bg-slate-800/30 transition-colors">
             <td class="px-4 py-3 text-sm font-mono text-slate-600 text-center w-12">${company.rank}</td>
-            <td class="px-4 py-3 text-sm text-slate-300 w-48">
+            <td class="px-4 py-3 text-sm text-slate-400 w-48">
               <div class="truncate max-w-[11rem]" title="${company.companyName}">${company.companyName}</div>
             </td>
-            <td class="px-4 py-3 text-sm font-semibold text-slate-200 w-20">${company.symbol}</td>
+            <td class="px-4 py-3 text-sm font-semibold font-mono text-slate-200 w-20 cursor-pointer hover:text-cyan-300 transition-colors" onclick="selectStockFromSearch('${company.symbol}')" title="View detailed analysis">${company.symbol}</td>
             ${cells}
             <td class="px-4 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-slate-200' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
             <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${srCls}">${srText}</td>
@@ -1909,8 +2129,7 @@
       scanBtn.innerHTML = `<svg class="animate-spin inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 opacity-70" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>Scanning…`;
 
       const sectorLabel = sector === 'default' ? 'General' : sector;
-      document.getElementById('heading-context').textContent = `— ${sectorLabel}`;
-      document.getElementById('heading-context').classList.remove('hidden');
+      hideStockHeader();
       document.getElementById('heading-date').classList.add('hidden');
 
       // Show threshold reference panel (with MoS applied)
@@ -2023,6 +2242,8 @@
      * the same browser session does not re-prompt the user.
      */
     function dismissDisclaimer() {
+      if (sessionStorage.getItem('betaAccessGranted') !== 'true') return;
+
       const overlay = document.getElementById('disclaimer-overlay');
       const dashboard = document.getElementById('main-dashboard');
 
@@ -2040,15 +2261,227 @@
     }
 
     /**
-     * On page load: if the user already acknowledged the disclaimer in
-     * the current browser session, skip the modal entirely.
+     * On page load: beta gate → disclaimer → dashboard.
      */
     (function init() {
-      if (sessionStorage.getItem('disclaimerAcknowledged') === 'true') {
+      const betaGranted     = sessionStorage.getItem('betaAccessGranted') === 'true';
+      const disclaimerAcked = sessionStorage.getItem('disclaimerAcknowledged') === 'true';
+
+      if (betaGranted && disclaimerAcked) {
+        document.getElementById('beta-gate-overlay').style.display = 'none';
         document.getElementById('disclaimer-overlay').style.display = 'none';
         document.getElementById('main-dashboard').classList.remove('hidden');
+      } else if (betaGranted) {
+        document.getElementById('beta-gate-overlay').style.display = 'none';
+      } else {
+        document.getElementById('beta-gate-overlay').style.display = 'flex';
       }
+
+      initGlobalSearch();
     })();
+
+    // ── BETA ACCESS GATE ─────────────────────────────────────────────────────────
+    async function submitBetaCode() {
+      const input   = document.getElementById('beta-code-input');
+      const errorEl = document.getElementById('beta-error');
+      const btn     = document.getElementById('beta-submit-btn');
+      const code    = input.value.trim();
+
+      errorEl.classList.add('hidden');
+      errorEl.textContent = '';
+      if (!code) {
+        errorEl.textContent = 'Enter your beta access code.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+
+      try {
+        const res  = await fetch('/api/beta', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.valid) {
+          throw new Error(data.error || 'Invalid beta access code.');
+        }
+
+        sessionStorage.setItem('betaAccessGranted', 'true');
+        const overlay = document.getElementById('beta-gate-overlay');
+        overlay.style.transition = 'opacity 0.3s ease';
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.style.display = 'none'; }, 300);
+      } catch (err) {
+        errorEl.textContent = err.message || 'Unable to verify code. Please try again.';
+        errorEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enter';
+      }
+    }
+
+    async function submitWaitlist() {
+      const input   = document.getElementById('waitlist-email');
+      const msgEl   = document.getElementById('waitlist-message');
+      const btn     = document.getElementById('waitlist-submit-btn');
+      const email   = input.value.trim();
+
+      msgEl.classList.add('hidden');
+      msgEl.textContent = '';
+      if (!email) {
+        msgEl.textContent = 'Enter your email address.';
+        msgEl.className = 'mt-2 text-xs text-rose-400/90';
+        msgEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Joining…';
+
+      try {
+        const res  = await fetch('/api/waitlist', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Unable to join waitlist.');
+
+        msgEl.textContent = data.message || 'You are on the waitlist.';
+        msgEl.className = 'mt-2 text-xs text-emerald-400/90';
+        msgEl.classList.remove('hidden');
+        input.value = '';
+      } catch (err) {
+        msgEl.textContent = err.message || 'Something went wrong. Please try again.';
+        msgEl.className = 'mt-2 text-xs text-rose-400/90';
+        msgEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Join';
+      }
+    }
+
+    // ── GLOBAL SEARCH ────────────────────────────────────────────────────────────
+    let searchDebounceTimer = null;
+    let searchActiveIndex   = -1;
+    let searchResults       = [];
+
+    function initGlobalSearch() {
+      const input   = document.getElementById('global-search-input');
+      const results = document.getElementById('global-search-results');
+      if (!input || !results) return;
+
+      input.addEventListener('input', () => {
+        clearTimeout(searchDebounceTimer);
+        const q = input.value.trim();
+        if (q.length < 1) {
+          hideSearchResults();
+          return;
+        }
+        searchDebounceTimer = setTimeout(() => fetchSearchResults(q), 250);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          moveSearchSelection(1);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          moveSearchSelection(-1);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (searchActiveIndex >= 0 && searchResults[searchActiveIndex]) {
+            selectStockFromSearch(searchResults[searchActiveIndex].symbol);
+          }
+        } else if (e.key === 'Escape') {
+          hideSearchResults();
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+          hideSearchResults();
+        }
+      });
+    }
+
+    async function fetchSearchResults(q) {
+      const input   = document.getElementById('global-search-input');
+      const listEl  = document.getElementById('global-search-results');
+
+      try {
+        const res  = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Search failed');
+
+        searchResults     = data.results ?? [];
+        searchActiveIndex = -1;
+
+        if (searchResults.length === 0) {
+          listEl.innerHTML = `<div class="px-4 py-3 text-sm text-slate-500">No matches found</div>`;
+        } else {
+          listEl.innerHTML = searchResults.map((item, i) => `
+            <button
+              type="button"
+              role="option"
+              aria-selected="false"
+              data-index="${i}"
+              class="search-result-item w-full text-left px-4 py-2.5 text-sm text-slate-300
+                     border-b border-slate-800/60 last:border-0 transition-colors"
+              onmousedown="event.preventDefault(); selectStockFromSearch('${item.symbol}')"
+            >
+              <span class="font-mono font-semibold text-slate-100">${escapeHtml(item.symbol)}</span>
+              <span class="text-slate-600 mx-1.5">—</span>
+              <span class="text-slate-400">${escapeHtml(item.companyName)}</span>
+            </button>
+          `).join('');
+        }
+
+        listEl.classList.remove('hidden');
+        input.setAttribute('aria-expanded', 'true');
+      } catch {
+        listEl.innerHTML = `<div class="px-4 py-3 text-sm text-slate-500">Search unavailable</div>`;
+        listEl.classList.remove('hidden');
+      }
+    }
+
+    function moveSearchSelection(delta) {
+      const items = document.querySelectorAll('.search-result-item');
+      if (!items.length) return;
+
+      searchActiveIndex = Math.max(-1, Math.min(items.length - 1, searchActiveIndex + delta));
+      items.forEach((el, i) => {
+        el.setAttribute('aria-selected', String(i === searchActiveIndex));
+      });
+      if (searchActiveIndex >= 0) items[searchActiveIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function hideSearchResults() {
+      const input  = document.getElementById('global-search-input');
+      const listEl = document.getElementById('global-search-results');
+      if (listEl) {
+        listEl.classList.add('hidden');
+        listEl.innerHTML = '';
+      }
+      if (input) input.setAttribute('aria-expanded', 'false');
+      searchResults     = [];
+      searchActiveIndex = -1;
+    }
+
+    function selectStockFromSearch(symbol) {
+      const searchInput = document.getElementById('global-search-input');
+      const tickerInput = document.getElementById('ticker-input');
+
+      hideSearchResults();
+      if (searchInput) searchInput.value = '';
+
+      switchTab('ticker', { preserveContext: false });
+      if (tickerInput) tickerInput.value = symbol.toUpperCase();
+      runScreener();
+    }
   </script>
 
 </body>

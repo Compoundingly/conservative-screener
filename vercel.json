@@ -11,6 +11,18 @@
     "api/trend.js": {
       "memory": 256,
       "maxDuration": 30
+    },
+    "api/search.js": {
+      "memory": 128,
+      "maxDuration": 10
+    },
+    "api/beta.js": {
+      "memory": 128,
+      "maxDuration": 5
+    },
+    "api/waitlist.js": {
+      "memory": 128,
+      "maxDuration": 5
     }
   }
 }

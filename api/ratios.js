@@ -19,7 +19,7 @@ import YahooFinance from 'yahoo-finance2';
 
 const yahooFinance = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail'];
+const MODULES = ['defaultKeyStatistics', 'financialData', 'summaryDetail', 'price', 'summaryProfile'];
 
 const TAX = 0.21; // US corporate tax rate — shared by computeReinvestmentRate and computeROIC
 
@@ -247,9 +247,18 @@ export default async function handler(req, res) {
   const ks = result.defaultKeyStatistics ?? {};
   const fd = result.financialData        ?? {};
   const sd = result.summaryDetail        ?? {};
+  const px = result.price                ?? {};
+  const sp = result.summaryProfile       ?? {};
+
+  const companyName = sp.longName ?? sp.shortName ?? px.shortName ?? px.longName ?? null;
+  const currentPrice = px.regularMarketPrice ?? px.postMarketPrice ?? null;
+  const changePercent = px.regularMarketChangePercent ?? null;
 
   return res.status(200).json({
     ticker:           symbol,
+    companyName,
+    currentPrice,
+    changePercent,
     fiscalDateEnding: null,
     observedValues: {
       current_ratio:     fd.currentRatio   ?? null,
