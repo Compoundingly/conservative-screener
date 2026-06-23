@@ -73,7 +73,7 @@
       },
     }
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <!-- ── Structured data ──────────────────────────────────────────────────── -->
   <script type="application/ld+json">
@@ -451,6 +451,22 @@
       #filter-cards-container > div,
       #completion-summary {
         padding: 1rem;
+      }
+    }
+
+    /* ── Reduced-motion accessibility (WCAG 2.3.3) ───────────────────────── */
+    /* Collapse all CSS animations/transitions to instant for users who have
+     * "Reduce Motion" enabled in their OS accessibility settings.
+     * 0.01ms (not 0) avoids a Chromium quirk where 0s transitions can still
+     * fire transitionend events unreliably. */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
       }
     }
   </style>
@@ -2923,8 +2939,9 @@
       const overlay = document.getElementById('disclaimer-overlay');
       const dashboard = document.getElementById('main-dashboard');
 
-      // Animate overlay out
-      overlay.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      // Animate overlay out — skip transition for users who prefer reduced motion
+      const noMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      overlay.style.transition = noMotion ? 'none' : 'opacity 0.3s ease, transform 0.3s ease';
       overlay.style.opacity = '0';
       overlay.style.transform = 'scale(1.02)';
 
@@ -2934,7 +2951,7 @@
         dashboard.classList.remove('hidden');
         localStorage.setItem(DISCLAIMER_KEY, 'true');
         focusGlobalSearch();
-      }, 300);
+      }, noMotion ? 0 : 300);
     }
 
     /**
@@ -2974,7 +2991,8 @@
       const overlay = document.getElementById('beta-gate-overlay');
       if (!overlay) return;
 
-      overlay.style.transition = 'opacity 0.35s ease';
+      const noMotionBeta = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      overlay.style.transition = noMotionBeta ? 'none' : 'opacity 0.35s ease';
       overlay.style.opacity = '0';
 
       setTimeout(() => {
@@ -2992,7 +3010,7 @@
           const betaInput = document.getElementById('beta-code-input');
           if (betaInput) betaInput.blur();
         }
-      }, 350);
+      }, noMotionBeta ? 0 : 350);
     }
 
     async function submitBetaCode() {
