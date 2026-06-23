@@ -169,9 +169,40 @@
       color: #94a3b8;
     }
 
-    /* Live price change — market data, not evaluation */
-    .price-up   { color: #34d399; }
-    .price-down { color: #fb7185; }
+    /* ── Stock header (premium quote strip) ─────────────────────────────────── */
+    #stock-header {
+      margin-top: 1.25rem;
+      margin-bottom: 0.25rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.55);
+    }
+    .stock-price-display {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.025em;
+    }
+    .change-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.3125rem 0.75rem;
+      border-radius: 9999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .change-pill-up {
+      background: rgba(16, 185, 129, 0.18);
+      border: 1px solid rgba(52, 211, 153, 0.32);
+      color: #6ee7b7;
+    }
+    .change-pill-down {
+      background: rgba(244, 63, 94, 0.18);
+      border: 1px solid rgba(251, 113, 133, 0.32);
+      color: #fda4af;
+    }
 
     /* Global search dropdown */
     #global-search-results {
@@ -542,13 +573,25 @@
           <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
         </div>
         <!-- Stock detail header — populated by renderDashboard() -->
-        <div id="stock-header" class="hidden mt-4 mb-1">
-          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h3 id="stock-title" class="text-3xl sm:text-4xl font-bold text-slate-50 tracking-tight font-mono"></h3>
-          </div>
-          <div id="stock-price-row" class="hidden mt-2 flex items-baseline gap-3">
-            <span id="stock-price" class="text-2xl sm:text-3xl font-semibold font-mono text-slate-100"></span>
-            <span id="stock-change" class="text-lg font-semibold font-mono"></span>
+        <div id="stock-header" class="hidden">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+
+            <!-- Identity: ticker + company name -->
+            <div class="flex min-w-0 flex-col gap-1.5">
+              <div id="stock-identity" class="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                <span id="stock-ticker" class="font-mono text-xl font-bold tracking-tight text-slate-50 sm:text-2xl"></span>
+                <span id="stock-sep" class="hidden text-slate-600 select-none">—</span>
+                <span id="stock-company" class="truncate font-sans text-xl font-medium tracking-tight text-slate-400 sm:text-2xl"></span>
+              </div>
+              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">Single Ticker Analysis</p>
+            </div>
+
+            <!-- Quote: price + daily change pill -->
+            <div id="stock-price-row" class="hidden flex items-center gap-3 sm:gap-4 flex-shrink-0">
+              <span id="stock-price" class="stock-price-display font-mono text-4xl font-semibold text-white sm:text-5xl"></span>
+              <span id="stock-change" class="change-pill" aria-label="Daily change"></span>
+            </div>
+
           </div>
         </div>
         <p class="mt-1.5 text-sm text-slate-500 max-w-xl">
@@ -1091,16 +1134,28 @@
     }
 
     function renderStockHeader(ticker, companyName, currentPrice, changePercent) {
-      const headerEl = document.getElementById('stock-header');
-      const titleEl  = document.getElementById('stock-title');
-      const priceRow = document.getElementById('stock-price-row');
-      const priceEl  = document.getElementById('stock-price');
-      const changeEl = document.getElementById('stock-change');
+      const headerEl  = document.getElementById('stock-header');
+      const tickerEl  = document.getElementById('stock-ticker');
+      const sepEl     = document.getElementById('stock-sep');
+      const companyEl = document.getElementById('stock-company');
+      const priceRow  = document.getElementById('stock-price-row');
+      const priceEl   = document.getElementById('stock-price');
+      const changeEl  = document.getElementById('stock-change');
 
-      if (!headerEl || !titleEl) return;
+      if (!headerEl || !tickerEl) return;
 
-      const namePart = companyName ? ` — ${companyName}` : '';
-      titleEl.textContent = `${ticker}${namePart}`;
+      tickerEl.textContent = ticker;
+
+      if (companyName) {
+        companyEl.textContent = companyName;
+        companyEl.classList.remove('hidden');
+        sepEl.classList.remove('hidden');
+      } else {
+        companyEl.textContent = '';
+        companyEl.classList.add('hidden');
+        sepEl.classList.add('hidden');
+      }
+
       headerEl.classList.remove('hidden');
 
       if (currentPrice !== null && currentPrice !== undefined) {
@@ -1110,10 +1165,12 @@
         if (changePercent !== null && changePercent !== undefined) {
           const isUp = changePercent >= 0;
           changeEl.textContent = formatChangePercent(changePercent);
-          changeEl.className = 'text-lg font-semibold font-mono ' + (isUp ? 'price-up' : 'price-down');
+          changeEl.className = 'change-pill ' + (isUp ? 'change-pill-up' : 'change-pill-down');
+          changeEl.setAttribute('aria-label', `Daily change ${formatChangePercent(changePercent)}`);
         } else {
           changeEl.textContent = '';
-          changeEl.className = '';
+          changeEl.className = 'change-pill hidden';
+          changeEl.removeAttribute('aria-label');
         }
       } else {
         priceRow.classList.add('hidden');
