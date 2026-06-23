@@ -1172,19 +1172,19 @@
     const TOOLTIP_DEFINITIONS = {
       current_ratio: {
         definition: 'Current assets ÷ current liabilities. Measures short-term liquidity — the firm\'s ability to meet obligations due within one year from assets expected to convert to cash in the same period.',
-        benchmark:  'Benjamin Graham required ≥ 2.0× for industrial companies, treating any ratio below 1.5× as a working-capital stress signal. Sector thresholds in this screener are adjusted for capital-intensive industries.',
+        benchmark:  'Classical liquidity criteria require ≥ 2.0× for industrial companies, treating any ratio below 1.5× as a working-capital stress signal. Sector thresholds in this screener are adjusted for capital-intensive industries.',
       },
       debt_to_equity: {
         definition: 'Total financial debt ÷ total stockholders\' equity. Displayed in Yahoo Finance\'s percentage format: 100 = 1.0× ratio. Quantifies financial leverage and the reliance on creditor versus owner financing.',
-        benchmark:  'Graham\'s rule: long-term debt ≤ 50 % of net tangible assets (≤ 100 in this format for most sectors). Capital-intensive sectors — REITs, Utilities, Financials — structurally carry higher leverage by design and have sector-adjusted ceilings.',
+        benchmark:  'Conservative capital-structure criteria: long-term debt ≤ 50 % of net tangible assets (≤ 100 in this format for most sectors). Capital-intensive sectors — REITs, Utilities, Financials — structurally carry higher leverage by design and have sector-adjusted ceilings.',
       },
       price_to_book: {
         definition: 'Market price per share ÷ book value per share (net assets per share). Compares market capitalisation to the accounting value of net assets. A ratio below 1.0× implies the market prices the business below its theoretical liquidation value.',
-        benchmark:  'Graham\'s "defensive investor" ceiling: ≤ 1.5× (or combined P/E × P/B ≤ 22.5). Intangible-intensive sectors (Technology, Healthcare, Consumer Brands) legitimately trade above book because valuable assets — patents, software, brand equity — are expensed rather than capitalised.',
+        benchmark:  'Classic defensive-investor ceiling: ≤ 1.5× (or combined P/E × P/B ≤ 22.5). Intangible-intensive sectors (Technology, Healthcare, Consumer Brands) legitimately trade above book because valuable assets — patents, software, brand equity — are expensed rather than capitalised.',
       },
       price_to_earnings: {
         definition: 'Current share price ÷ trailing-twelve-month earnings per share. Represents the price paid per dollar of current earnings. Its inverse (E/P) is the "earnings yield." Negative P/E (loss-making companies) is treated as N/A and sinks to the bottom when sorting.',
-        benchmark:  'Graham\'s ceiling for defensive investors: ≤ 15× trailing earnings (or combined P/E × P/B ≤ 22.5). Growth-premium sectors warrant higher multiples reflecting durable reinvestment opportunities above the cost of capital. Forward P/E is used as a fallback when trailing is unavailable.',
+        benchmark:  'Defensive-investor ceiling: ≤ 15× trailing earnings (or combined P/E × P/B ≤ 22.5). Growth-premium sectors warrant higher multiples reflecting durable reinvestment opportunities above the cost of capital. Forward P/E is used as a fallback when trailing is unavailable.',
       },
       roic: {
         definition: 'Cash ROIC = EBITDA × (1 − 0.21) ÷ Invested Capital, where Invested Capital = Equity + Debt − Cash. WACC (Weighted Average Cost of Capital) is estimated via CAPM: Ke = rf + β × MRP, blended with after-tax cost of debt. Spread = ROIC − WACC.',
@@ -1197,11 +1197,11 @@
       },
       dividend_trap: {
         definition: 'Payout Ratio = dividends paid ÷ net income. A high payout ratio signals that a disproportionate share of earnings is being returned rather than reinvested, leaving little buffer for debt service or capex during downturns.',
-        benchmark:  'Graham / Mauboussin: payout > 80 % of earnings is generally unsustainable — a potential dividend trap. Companies paying no dividend (payout ratio null or zero) are excluded from this check.',
+        benchmark:  'Empirical earnings-sustainability threshold: payout > 80 % of earnings is generally unsustainable — a potential dividend trap. Companies paying no dividend (payout ratio null or zero) are excluded from this check.',
       },
       debt_load: {
         definition: 'Evaluates whether total financial leverage — measured via Debt/Equity in Yahoo Finance\'s percentage format — is within structurally sound bounds. Negative equity (de < 0) indicates a technically insolvent balance sheet.',
-        benchmark:  'Trigger threshold: D/E > 100 (i.e. debt exceeds equity) or negative equity. Referencing Graham\'s 50 % capitalisation rule. Sector-specific D/E ceilings in SECTOR_CONFIG override the Structural Risk baseline.',
+        benchmark:  'Trigger threshold: D/E > 100 (i.e. debt exceeds equity) or negative equity. Applies the classical 50 % capitalisation rule. Sector-specific D/E ceilings in SECTOR_CONFIG override the Structural Risk baseline.',
       },
       coverage: {
         definition: 'Interest Coverage = EBITDA ÷ Interest Expense. Approximates how many times operating cash earnings cover the annual interest burden. Uses the directly reported interest expense from annual financial statements when available; falls back to an EBITDA-proxy (EBITDA ÷ Total Debt × 5 % assumed borrowing rate) for tickers where no direct interest-expense line is reported.',
@@ -1305,7 +1305,7 @@
     // by a narrow margin, consistent with this screener's existing strictness.
     // reinvestment_rate is flat at 50 (= 50 %, pre-scaled) across all included sectors.
     const SECTOR_CONFIG = {
-      // Conservative base thresholds (Graham-style)
+      // Conservative base thresholds (classical value-screening criteria)
       default:             { current_ratio: 2.0, debt_to_equity:  150, price_to_book: 1.5,  price_to_earnings: 15.0, ev_to_ebitda: 10.0, reinvestment_rate: 50 },
 
       // Sectors with real-asset backing — higher D/E and P/B are structurally normal
