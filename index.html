@@ -147,27 +147,7 @@
       animation: fadeIn 0.35s ease-out forwards;
     }
 
-    /* Metric value / title hierarchy */
-    .metric-title { color: #9ca3af; } /* gray-400 */
-    .metric-value { color: #f8fafc; font-weight: 600; } /* white, semibold */
-    .metric-value-alt { color: #22d3ee; font-weight: 600; } /* cyan-400 */
-
-    /* Criteria status badges */
-    .badge-satisfied {
-      background: rgba(16, 185, 129, 0.18);
-      border-color: rgba(52, 211, 153, 0.35);
-      color: #6ee7b7;
-    }
-    .badge-unmet {
-      background: rgba(251, 113, 133, 0.18);
-      border-color: rgba(253, 164, 175, 0.35);
-      color: #fda4af;
-    }
-    .badge-neutral {
-      background: rgba(15, 23, 42, 1);
-      border-color: #334155;
-      color: #94a3b8;
-    }
+    /* Metric cards — typography & badges use Tailwind utilities in JS templates */
 
     /* ── Stock header (premium quote strip) ─────────────────────────────────── */
     #stock-header {
@@ -1156,9 +1136,29 @@
     }
 
     function criteriaBadgeClass(statusLabel) {
-      if (statusLabel === 'Criteria Satisfied') return 'badge-satisfied';
-      if (statusLabel === 'Criteria Unmet')     return 'badge-unmet';
-      return 'badge-neutral';
+      const base = 'inline-flex items-center text-xs font-medium font-mono rounded-full px-2.5 py-0.5 border';
+      if (statusLabel === 'Criteria Satisfied') {
+        return `${base} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`;
+      }
+      if (statusLabel === 'Criteria Unmet') {
+        return `${base} bg-rose-500/10 text-rose-400 border-rose-500/20`;
+      }
+      return `${base} bg-slate-800/60 text-slate-400 border-slate-600/30`;
+    }
+
+    function statusBadgeClass(kind) {
+      const base = 'inline-flex items-center text-xs font-medium font-mono rounded-full px-2.5 py-0.5 border';
+      if (kind === 'satisfied') {
+        return `${base} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`;
+      }
+      if (kind === 'unmet') {
+        return `${base} bg-rose-500/10 text-rose-400 border-rose-500/20`;
+      }
+      return `${base} bg-slate-800/60 text-slate-400 border-slate-600/30`;
+    }
+
+    function metricValueClass(hasValue) {
+      return hasValue ? 'text-cyan-400 font-semibold' : 'text-slate-600 font-normal';
     }
 
     function formatPrice(price) {
@@ -1256,14 +1256,14 @@
           const divider   = idx < items.length - 1
             ? `<div class="w-full h-px bg-slate-700/50"></div>`
             : '';
-          const valCls = item.observedValue === null || item.observedValue === undefined
-            ? 'text-slate-600'
-            : 'metric-value-alt';
+          const valCls = metricValueClass(
+            item.observedValue !== null && item.observedValue !== undefined
+          );
           const hasTip = item.id in TOOLTIP_DEFINITIONS;
           return `
-            <div class="flex justify-between items-center text-sm">
-              <span class="metric-title text-sm${hasTip ? ' cursor-help' : ''}"${hasTip ? ` data-tooltip-key="${item.id}"` : ''}>${item.label}${hasTip ? '<span class="tip-dot">ⓘ</span>' : ''}</span>
-              <span class="font-mono ${valCls}">${observed} <span class="text-slate-600 font-normal">${threshold}</span></span>
+            <div class="flex justify-between items-center text-sm gap-4">
+              <span class="text-slate-400 text-sm${hasTip ? ' cursor-help' : ''}"${hasTip ? ` data-tooltip-key="${item.id}"` : ''}>${item.label}${hasTip ? '<span class="tip-dot">ⓘ</span>' : ''}</span>
+              <span class="font-mono text-right ${valCls}">${observed} <span class="text-slate-600 font-normal text-xs">${threshold}</span></span>
             </div>${divider}`;
         }).join('');
 
@@ -1271,7 +1271,7 @@
           <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">${groupName}</span>
-              <span class="text-xs font-mono border rounded px-2 py-0.5 ${criteriaBadgeClass(statusLabel)}">${statusLabel}</span>
+              <span class="${criteriaBadgeClass(statusLabel)}">${statusLabel}</span>
             </div>
             <div class="space-y-2">${rows}</div>
             <div class="pt-1 text-xs text-slate-500">${satisfied} / ${total} criteria met</div>
@@ -1348,16 +1348,16 @@
         const srBadgeLabel = srLevel === 'clear'     ? '✓ No Triggers'
                            : srLevel === 'triggered' ? `✗ ${srTriggers.join(', ')}`
                            : '— Insufficient Data';
-        const srBadgeCls   = srLevel === 'clear'     ? 'badge-satisfied'
-                           : srLevel === 'triggered' ? 'badge-unmet'
-                           : 'badge-neutral';
+        const srBadgeCls   = srLevel === 'clear'     ? statusBadgeClass('satisfied')
+                           : srLevel === 'triggered' ? statusBadgeClass('unmet')
+                           : statusBadgeClass('neutral');
         const triggerCount = srTriggers.length;
 
         structuralRiskCard = `
           <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
             <div class="flex items-center justify-between">
               <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Structural Risk</span>
-              <span class="text-xs font-mono border rounded px-2 py-0.5 ${srBadgeCls}">${srBadgeLabel}</span>
+              <span class="${srBadgeCls}">${srBadgeLabel}</span>
             </div>
             <div class="space-y-2">
               ${vitRow}
@@ -1386,32 +1386,32 @@
           const roicPct     = (roic * 100).toFixed(1);
           const waccPct     = (wacc * 100).toFixed(1);
           const spreadPct   = (Math.abs(spread) * 100).toFixed(1);
-          const badgeCls    = aboveWacc ? 'badge-satisfied' : 'badge-unmet';
+          const badgeCls    = aboveWacc ? statusBadgeClass('satisfied') : statusBadgeClass('unmet');
           const badgeLabel  = aboveWacc
             ? `✓ ROIC > WACC (+${spreadPct} pp)`
             : `✗ ROIC < WACC (−${spreadPct} pp)`;
-          const roicCls     = 'metric-value-alt';
+          const valueCls    = 'text-cyan-400 font-semibold';
 
           capitalCard = `
             <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
-              <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between gap-3">
                 <span class="text-xs font-semibold uppercase tracking-widest text-slate-500" data-tooltip-key="roic">Capital Efficiency<span class="tip-dot">ⓘ</span></span>
-                <span class="text-xs font-mono border rounded px-2 py-0.5 ${badgeCls}">${badgeLabel}</span>
+                <span class="${badgeCls}">${badgeLabel}</span>
               </div>
               <div class="space-y-2">
-                <div class="flex justify-between items-center text-sm">
-                  <span class="metric-title">Cash ROIC (approx.)</span>
-                  <span class="font-mono ${roicCls}">${roicPct}%</span>
+                <div class="flex justify-between items-center text-sm gap-4">
+                  <span class="text-slate-400">Cash ROIC (approx.)</span>
+                  <span class="font-mono ${valueCls}">${roicPct}%</span>
                 </div>
                 <div class="w-full h-px bg-slate-700/50"></div>
-                <div class="flex justify-between items-center text-sm">
-                  <span class="metric-title">WACC (approx.)</span>
-                  <span class="font-mono metric-value">${waccPct}%</span>
+                <div class="flex justify-between items-center text-sm gap-4">
+                  <span class="text-slate-400">WACC (approx.)</span>
+                  <span class="font-mono ${valueCls}">${waccPct}%</span>
                 </div>
                 <div class="w-full h-px bg-slate-700/50"></div>
-                <div class="flex justify-between items-center text-sm">
-                  <span class="metric-title">Spread vs WACC</span>
-                  <span class="font-mono ${roicCls}">${spreadSign}${spreadPct} pp</span>
+                <div class="flex justify-between items-center text-sm gap-4">
+                  <span class="text-slate-400">Spread vs WACC</span>
+                  <span class="font-mono ${valueCls}">${spreadSign}${spreadPct} pp</span>
                 </div>
               </div>
               <div class="pt-1 text-xs text-slate-500">
@@ -1423,7 +1423,7 @@
             <div class="bg-brand-800 border border-slate-700/60 rounded-xl p-5 space-y-3">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-semibold uppercase tracking-widest text-slate-500">Capital Efficiency</span>
-                <span class="text-xs font-mono bg-brand-900 border border-slate-700 rounded px-2 py-0.5 text-slate-700">— Insufficient Data</span>
+                <span class="${statusBadgeClass('neutral')}">— Insufficient Data</span>
               </div>
               <p class="text-sm text-slate-700 py-2">ROIC cannot be computed — required fields (EBITDA, D/E, or equity) are unavailable for this ticker.</p>
             </div>`;
@@ -1454,13 +1454,13 @@
      */
     function buildSRRow(label, description, status, detail, tooltipKey) {
       const icon    = status === 'pass' ? '✓' : status === 'fail' ? '✗' : '—';
-      const valCls  = status === 'unknown' ? 'text-slate-600' : 'metric-value-alt';
+      const valCls  = status === 'unknown' ? 'text-slate-600 font-normal' : 'text-cyan-400 font-semibold';
       const tipAttr = tooltipKey ? ` data-tooltip-key="${tooltipKey}"` : '';
       const tipDot  = tooltipKey ? '<span class="tip-dot">ⓘ</span>' : '';
       return `
         <div class="flex justify-between items-start text-sm gap-3">
           <div>
-            <span class="metric-title cursor-help"${tipAttr}>${label}${tipDot}</span>
+            <span class="text-slate-400 cursor-help"${tipAttr}>${label}${tipDot}</span>
             <span class="block text-xs text-slate-600 mt-0.5">${description}</span>
           </div>
           <span class="font-mono whitespace-nowrap ${valCls} flex-shrink-0">${icon} ${detail}</span>
@@ -2053,7 +2053,7 @@
       function thCls(id, align) {
         const active = id === sortState.id;
         const base   = `px-4 py-3 text-xs font-semibold uppercase tracking-widest cursor-pointer select-none whitespace-nowrap transition-colors ${align ?? ''}`;
-        return `${base} ${active ? 'text-slate-300' : 'text-slate-600 hover:text-slate-400'}`;
+        return `${base} ${active ? 'text-slate-300' : 'text-slate-400 hover:text-slate-300'}`;
       }
       function arrow(id) {
         if (id !== sortState.id) return ` <span class="opacity-25">⇅</span>`;
@@ -2080,8 +2080,7 @@
           const valStr    = formatValue(rawVal, f.unit);
           const isActive  = f.id === sortState.id;
           const criterion = calcResults.find(r => r.id === f.id);
-          // Bright cyan values for legibility; N/A stays dim
-          const textCls = isNull ? 'text-slate-600' : 'metric-value-alt';
+          const textCls = isNull ? 'text-slate-600 font-normal' : 'text-cyan-400 font-semibold';
           return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
@@ -2091,37 +2090,30 @@
         let srText, srCls;
         if (srLevel === 'clear') {
           srText = '✓ No Triggers';
-          srCls  = srActive ? 'text-sky-200' : 'text-sky-300';
+          srCls  = 'text-emerald-400 font-medium';
         } else if (srLevel === 'triggered') {
           const label = srTriggers.length > 1 ? `${srTriggers.join(', ')}` : srTriggers[0];
           srText = `✗ ${label}`;
-          srCls  = srActive ? 'text-slate-300' : 'text-slate-500';
+          srCls  = 'text-rose-400 font-medium';
         } else {
           srText = '— No Data';
-          srCls  = 'text-slate-700';
+          srCls  = 'text-slate-600';
         }
 
-        // Capital Efficiency cell — ROIC vs WACC (Mauboussin framework)
-        // Color: sky = ROIC exceeds WACC (value creation)
-        //        slate-500 = ROIC below WACC (value dilution)
-        //        slate-700 = insufficient data
         const roic    = company.observedValues.roic ?? null;
         const wacc    = company.observedValues.wacc ?? null;
         const roicAct = 'roic' === sortState.id;
         let roicText, roicCls;
         if (roic === null || wacc === null) {
           roicText = '—';
-          roicCls  = 'text-slate-700';
+          roicCls  = 'text-slate-600 font-normal';
         } else {
           const roicPct  = (roic * 100).toFixed(1);
           const spread   = roic - wacc;
           const spreadPct = (Math.abs(spread) * 100).toFixed(1);
           const sign     = spread >= 0 ? '+' : '−';
-          roicText = `${roicPct}% <span class="text-xs opacity-60">(${sign}${spreadPct}pp)</span>`;
-          const aboveWacc = spread >= 0;
-          roicCls  = aboveWacc
-            ? (roicAct ? 'text-sky-200'   : 'text-sky-300')
-            : (roicAct ? 'text-slate-300' : 'text-slate-500');
+          roicText = `${roicPct}% <span class="text-xs text-slate-500 font-normal">(${sign}${spreadPct}pp)</span>`;
+          roicCls  = roicAct ? 'text-cyan-300 font-semibold' : 'text-cyan-400 font-semibold';
         }
 
         // Ticker cell uses font-sans so letter O is unambiguous from digit 0
@@ -2133,7 +2125,7 @@
             </td>
             <td class="px-4 py-3 text-sm font-semibold font-mono text-slate-200 w-20 cursor-pointer hover:text-cyan-300 transition-colors" onclick="selectStockFromSearch('${company.symbol}')" title="View detailed analysis">${company.symbol}</td>
             ${cells}
-            <td class="px-4 py-3 text-sm font-mono text-slate-500 text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-slate-200' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
+            <td class="px-4 py-3 text-sm font-mono text-cyan-400 font-semibold text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-cyan-300' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
             <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${srCls}">${srText}</td>
             <td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${roicCls}">${roicText}</td>
           </tr>`;
@@ -2144,7 +2136,7 @@
           <table class="w-full min-w-[860px] border-collapse text-left bg-brand-800">
             <thead>
               <tr class="bg-brand-900 border-b border-slate-700/80">
-                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-600 text-center w-12">Rank</th>
+                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-400 text-center w-12">Rank</th>
                 <th scope="col" onclick="resortTable('companyName')" class="${thCls('companyName', 'w-48')}">Company${arrow('companyName')}</th>
                 <th scope="col" onclick="resortTable('symbol')" class="${thCls('symbol', 'w-20')}">Ticker${arrow('symbol')}</th>
                 ${colHeaders}
