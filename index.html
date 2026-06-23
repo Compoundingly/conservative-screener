@@ -142,7 +142,7 @@
       border-radius: 0.5rem;
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       font-family: 'Inter', system-ui, sans-serif;
-      font-size: 11px;
+      font-size: 12px;
       line-height: 1.55;
     }
     #cs-tooltip .tp-section { padding: 10px 12px; }
@@ -155,9 +155,9 @@
       margin-bottom: 5px;
     }
     #cs-tooltip .tp-def  { color: #94a3b8; }   /* definition label  */
-    #cs-tooltip .tp-defb { color: #cbd5e1; font-size: 11px; } /* definition body  */
-    #cs-tooltip .tp-bm   { color: #475569; }   /* benchmark label   */
-    #cs-tooltip .tp-bmb  { color: #475569; font-size: 10.5px; } /* benchmark body */
+    #cs-tooltip .tp-defb { color: #cbd5e1; font-size: 12px; } /* definition body  */
+    #cs-tooltip .tp-bm   { color: #94a3b8; }   /* benchmark label   */
+    #cs-tooltip .tp-bmb  { color: #94a3b8; font-size: 12px; } /* benchmark body */
     /* ── TickerInsights terminal panel ───────────────────────────────────────*/
     @keyframes cs-blink {
       0%, 49%  { opacity: 0.8; }
@@ -191,11 +191,11 @@
       display: inline-block;
       margin-left: 3px;
       font-size: 9px;
-      opacity: 0.35;
+      opacity: 0.5;
       vertical-align: middle;
       transition: opacity .15s;
     }
-    [data-tooltip-key]:hover .tip-dot { opacity: 0.7; }
+    [data-tooltip-key]:hover .tip-dot { opacity: 0.85; }
 
     /* CTA button lock animation */
     @keyframes unlock-pulse {
@@ -379,6 +379,35 @@
     /* Visual separator after the last sticky column */
     .sticky-col-ticker {
       box-shadow: 2px 0 6px -2px rgba(0, 0, 0, 0.45);
+    }
+
+    /* ── Mobile horizontal scroll — sector table ────────────────────────── */
+    /* iOS momentum scrolling + prevent page from navigating on table edge */
+    #sector-table-container .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+    }
+    /* Right-edge fade hint — visual cue that the table scrolls horizontally.
+     * Sits on top of the overflow container; pointer-events:none so it
+     * doesn't block clicks. Hidden on wide screens where no scroll is needed. */
+    #sector-table-container {
+      position: relative;
+    }
+    #sector-table-container::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 2.5rem;
+      pointer-events: none;
+      background: linear-gradient(to right, transparent, rgba(15, 23, 42, 0.7));
+      border-radius: 0 0.75rem 0.75rem 0;
+      z-index: 1;
+    }
+    @media (min-width: 1280px) {
+      /* Table fits fully at xl — no fade needed */
+      #sector-table-container::after { display: none; }
     }
 
     /* ── Touch targets — iOS/Android minimum 44×44 px ────────────────────── */
@@ -677,7 +706,7 @@
 
         <!-- Divider -->
         <div class="border-t border-slate-700/60 pt-4">
-          <p class="text-xs text-slate-600 italic">
+          <p class="text-xs text-slate-400 italic">
             By clicking "I Understand and Continue" below, you confirm that you have read, understood, and agree
             to the terms set out in this notice, and that you will use the Tool solely for informational and
             educational purposes.
@@ -719,7 +748,7 @@
           I Understand and Continue
         </button>
 
-        <p class="text-center text-xs text-slate-600">
+        <p class="text-center text-xs text-slate-400">
           If you do not agree, please close this browser tab.
         </p>
 
@@ -937,8 +966,8 @@
             aria-expanded="false"
             aria-controls="insights-panel"
             onclick="toggleInsights()"
-            class="flex items-center gap-2 text-xs font-mono text-slate-600
-                   hover:text-slate-400 transition-colors duration-150 cursor-pointer
+            class="flex items-center gap-2 text-xs font-mono text-slate-500
+                   hover:text-slate-300 transition-colors duration-150 cursor-pointer
                    focus:outline-none select-none"
           >
             <span id="insights-arrow">▸</span>
@@ -958,10 +987,10 @@
 
         <!-- Sector controls -->
         <div class="mb-8">
-          <div class="flex flex-wrap items-end gap-3">
+          <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
 
             <!-- Sector combobox -->
-            <div id="sector-combobox-wrap" class="relative flex flex-col gap-1.5 w-52 sm:w-56">
+            <div id="sector-combobox-wrap" class="relative flex flex-col gap-1.5 w-full sm:w-56">
               <label for="sector-combobox-input" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Sector</label>
               <div class="relative">
                 <input
@@ -995,7 +1024,7 @@
             </div>
 
             <!-- Margin of Safety -->
-            <div class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-1.5 w-full sm:w-auto">
               <label for="mos-select" class="text-xs font-medium text-slate-500 uppercase tracking-widest">Margin of Safety</label>
               <select
                 id="mos-select"
@@ -1016,7 +1045,7 @@
             <button
               id="scan-btn"
               onclick="runSectorScan()"
-              class="px-5 py-2.5 rounded-lg text-sm font-semibold
+              class="w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold
                      bg-slate-700 text-slate-200 border border-slate-600
                      hover:bg-slate-600 hover:border-slate-500
                      disabled:opacity-50 disabled:cursor-not-allowed
@@ -1077,7 +1106,7 @@
 
     <!-- Footer -->
     <footer class="flex-shrink-0 border-t border-slate-800 py-4 px-6">
-      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600">
+      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
         <span>© 2026 Compoundingly. All data is for informational and mathematical purposes only.</span>
         <span class="font-medium">NOT FINANCIAL ADVICE</span>
       </div>
@@ -2612,7 +2641,7 @@
           const isActive  = f.id === sortState.id;
           const criterion = calcResults.find(r => r.id === f.id);
           const textCls = isNull ? 'text-slate-600 font-normal' : 'text-cyan-400 font-semibold';
-          return `<td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
+          return `<td class="px-4 py-3 text-sm font-mono tabular-nums text-right whitespace-nowrap ${textCls}">${valStr}</td>`;
         }).join('');
 
         // Structural Risk cell (Vitality + Dividend Trap + Debt Load + Coverage)
@@ -2663,9 +2692,9 @@
               >${company.symbol}</button>
             </td>
             ${cells}
-            <td class="px-4 py-3 text-sm font-mono text-cyan-400 font-semibold text-center whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-cyan-300' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
-            <td class="px-4 py-3 text-sm font-mono text-center whitespace-nowrap ${srCls}">${srText}</td>
-            <td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${roicCls}">${roicText}</td>
+            <td class="px-4 py-3 text-sm font-mono tabular-nums text-cyan-400 font-semibold text-right whitespace-nowrap ${'criteria_met' === sortState.id ? '!text-cyan-300' : ''}">${metCount}&thinsp;/&thinsp;${total}</td>
+            <td class="px-4 py-3 text-sm font-mono text-right whitespace-nowrap ${srCls}">${srText}</td>
+            <td class="px-4 py-3 text-sm font-mono tabular-nums text-right whitespace-nowrap ${roicCls}">${roicText}</td>
           </tr>`;
       }).join('');
 
@@ -2678,15 +2707,15 @@
                 <th scope="col" onclick="resortTable('companyName')" class="${thCls('companyName', 'w-48')} sticky-col-company">Company${arrow('companyName')}</th>
                 <th scope="col" onclick="resortTable('symbol')" class="${thCls('symbol', 'w-20')} sticky-col-ticker">Ticker${arrow('symbol')}</th>
                 ${colHeaders}
-                <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-center')}">Criteria Met${arrow('criteria_met')}</th>
-                <th scope="col" onclick="resortTable('structural_risk')" class="${thCls('structural_risk', 'text-center')}">Structural Risk${arrow('structural_risk')}</th>
+                <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-right')}">Criteria Met${arrow('criteria_met')}</th>
+                <th scope="col" onclick="resortTable('structural_risk')" class="${thCls('structural_risk', 'text-right')}">Structural Risk${arrow('structural_risk')}</th>
                 <th scope="col" onclick="resortTable('roic')" class="${thCls('roic', 'text-right')}" data-tooltip-key="roic">ROIC <span class="font-normal opacity-50 normal-case tracking-normal">(vs WACC)</span><span class="tip-dot">ⓘ</span>${arrow('roic')}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
-        <p class="mt-3 text-xs text-slate-700 text-right">
+        <p class="mt-3 text-xs text-slate-500 text-right">
           Rank is an arithmetic sort position only. ROIC is an approximation (EBITDA-based cash NOPAT; WACC via CAPM). Not financial advice.
         </p>`;
 
