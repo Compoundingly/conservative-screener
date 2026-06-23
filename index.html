@@ -3,7 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
   <title>Conservative Screener — Compoundingly</title>
+
+  <!-- ── SEO ──────────────────────────────────────────────────────────────── -->
+  <meta name="description" content="Conservative Screener by Compoundingly — a quantitative filter dashboard applying Benjamin Graham–style mathematical thresholds to publicly available financial data. Not financial advice." />
+  <meta name="keywords" content="stock screener, conservative investing, quantitative analysis, financial ratios, Benjamin Graham, value investing, sector scan, P/E ratio, debt-to-equity, current ratio" />
+  <meta name="author" content="Compoundingly" />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- ── Open Graph ───────────────────────────────────────────────────────── -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:site_name"   content="Compoundingly" />
+  <meta property="og:title"       content="Conservative Screener — Compoundingly" />
+  <meta property="og:description" content="Quantitative filter dashboard applying mathematical threshold criteria to public financial data. Not financial advice." />
+  <meta property="og:image"       content="/og-image.png" />
+  <meta property="og:image:width"  content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt"   content="Conservative Screener dashboard preview" />
+  <meta property="og:url"         content="https://compoundingly.com/screener" />
+
+  <!-- ── Twitter / X Card ─────────────────────────────────────────────────── -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:site"        content="@compoundingly" />
+  <meta name="twitter:title"       content="Conservative Screener — Compoundingly" />
+  <meta name="twitter:description" content="Quantitative filter dashboard applying mathematical threshold criteria to public financial data. Not financial advice." />
+  <meta name="twitter:image"       content="/og-image.png" />
+  <meta name="twitter:image:alt"   content="Conservative Screener dashboard preview" />
+
+  <!-- ── PWA / Home Screen ────────────────────────────────────────────────── -->
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CS · Compoundingly" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- ── Resource hints ───────────────────────────────────────────────────── -->
+  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com" />
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -31,8 +73,6 @@
       },
     }
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     /* Subtle backdrop blur shimmer for the modal overlay */
@@ -263,6 +303,92 @@
     .sector-combobox-item[aria-selected="true"],
     .sector-combobox-item:hover { background: rgba(30, 41, 59, 0.9); }
     .sector-combobox-item.hidden-by-filter { display: none; }
+
+    /* ── Sticky identity columns (Rank / Company / Ticker) ───────────────────
+     * Allows horizontal scrolling of the financial data columns while keeping
+     * the company context visible on narrow/touch screens.
+     * Left offsets mirror the fixed widths set in the JS template strings:
+     *   Rank    → w-12 = 3rem (48px)
+     *   Company → w-48 = 12rem (192px)
+     *   Ticker  → w-20 = 5rem (80px)
+     */
+    .sticky-col-rank,
+    .sticky-col-company,
+    .sticky-col-ticker {
+      position: sticky;
+      z-index: 2;
+    }
+    .sticky-col-rank    { left: 0; }
+    .sticky-col-company { left: 3rem; }
+    .sticky-col-ticker  { left: 15rem; }   /* 3rem + 12rem */
+
+    /* thead cells float above tbody sticky cells */
+    thead .sticky-col-rank,
+    thead .sticky-col-company,
+    thead .sticky-col-ticker {
+      z-index: 3;
+      background-color: #0f172a;   /* brand-900 — thead background */
+    }
+    /* tbody cells need an opaque background to occlude scrolled content */
+    tbody tr .sticky-col-rank,
+    tbody tr .sticky-col-company,
+    tbody tr .sticky-col-ticker {
+      background-color: #1e293b;   /* brand-800 — table body background */
+    }
+    /* Restore hover tint on sticky cells so the row highlight stays consistent */
+    tbody tr:hover .sticky-col-rank,
+    tbody tr:hover .sticky-col-company,
+    tbody tr:hover .sticky-col-ticker {
+      background-color: rgba(30, 41, 59, 0.95);
+    }
+    /* Visual separator after the last sticky column */
+    .sticky-col-ticker {
+      box-shadow: 2px 0 6px -2px rgba(0, 0, 0, 0.45);
+    }
+
+    /* ── Touch targets — iOS/Android minimum 44×44 px ────────────────────── */
+    #beta-code-input,
+    #beta-submit-btn,
+    #waitlist-email,
+    #waitlist-submit-btn,
+    #global-search-input,
+    #ticker-input,
+    #run-btn,
+    #scan-btn,
+    #mos-select,
+    #sector-combobox-input {
+      min-height: 44px;
+    }
+    .search-result-item {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+    }
+    .sector-combobox-item {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+    }
+
+    /* ── Mobile padding — tighter layout on narrow screens ───────────────── */
+    @media (max-width: 639px) {
+      /* Shrink outer content gutter from 24px → 16px */
+      #main-dashboard > main {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 1.5rem;
+      }
+      /* Tighten the stock quote strip */
+      .stock-header-inner {
+        padding: 0.875rem 1rem;
+        gap: 0.875rem;
+      }
+      /* Reduce filter card inner padding so more cards fit */
+      #filter-cards-container > div,
+      #completion-summary {
+        padding: 1rem;
+      }
+    }
   </style>
 </head>
 
@@ -403,7 +529,7 @@
         <!-- Wordmark row -->
         <div class="flex items-center gap-2.5 mb-6">
           <div class="h-7 w-7 rounded-md bg-slate-600 flex items-center justify-center">
-            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.8"/>
               <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
               <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
@@ -418,7 +544,7 @@
         <!-- Title block -->
         <div class="flex items-start gap-3">
           <div class="flex-shrink-0 mt-0.5">
-            <svg class="w-5 h-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+            <svg class="w-5 h-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clip-rule="evenodd"/>
             </svg>
           </div>
@@ -579,7 +705,7 @@
         <!-- Left: Wordmark -->
         <div class="flex items-center gap-2.5 flex-shrink-0">
           <div class="h-6 w-6 rounded bg-slate-700 flex items-center justify-center">
-            <svg class="w-3.5 h-3.5 text-slate-300" viewBox="0 0 16 16" fill="none">
+            <svg class="w-3.5 h-3.5 text-slate-300" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <rect x="2" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.8"/>
               <rect x="9" y="2" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
               <rect x="2" y="9" width="5" height="5" rx="1" fill="currentColor" opacity="0.5"/>
@@ -636,7 +762,7 @@
       <!-- Page heading -->
       <div class="mb-6 fade-in">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h2>
+          <h1 class="text-2xl font-semibold text-slate-100">Quantitative Filter Dashboard</h1>
         </div>
         <!-- Stock detail header — populated by renderDashboard() -->
         <div id="stock-header" class="hidden">
@@ -696,6 +822,7 @@
         <div class="mb-8">
           <div class="flex items-center gap-3 max-w-sm">
             <div class="relative flex-1">
+              <label for="ticker-input" class="sr-only">Ticker symbol (1–5 letters, e.g. AAPL)</label>
               <input
                 id="ticker-input"
                 type="text"
@@ -729,7 +856,7 @@
         <div id="filter-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
             <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
-              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-.293.707L13 10.414V15a1 1 0 01-.553.894l-4 2A1 1 0 017 17v-6.586L3.293 6.707A1 1 0 013 6V4z" clip-rule="evenodd"/>
               </svg>
             </div>
@@ -867,7 +994,7 @@
         <div id="sector-table-container">
           <div class="flex flex-col items-center justify-center py-20 text-center">
             <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
-              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
+              <svg class="w-5 h-5 text-slate-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
               </svg>
             </div>
@@ -2315,11 +2442,11 @@
         // Ticker cell uses font-sans so letter O is unambiguous from digit 0
         return `
           <tr class="border-t border-slate-800/80 hover:bg-slate-800/30 transition-colors">
-            <td class="px-4 py-3 text-sm font-mono text-slate-600 text-center w-12">${company.rank}</td>
-            <td class="px-4 py-3 text-sm text-slate-400 w-48">
+            <td class="px-4 py-3 text-sm font-mono text-slate-600 text-center w-12 sticky-col-rank">${company.rank}</td>
+            <td class="px-4 py-3 text-sm text-slate-400 w-48 sticky-col-company">
               <div class="truncate max-w-[11rem]" title="${company.companyName}">${company.companyName}</div>
             </td>
-            <td class="px-4 py-3 text-sm w-20">
+            <td class="px-4 py-3 text-sm w-20 sticky-col-ticker">
               <button
                 type="button"
                 class="font-semibold font-mono text-slate-200 hover:text-cyan-300 transition-colors cursor-pointer"
@@ -2339,9 +2466,9 @@
           <table class="w-full min-w-[860px] border-collapse text-left bg-brand-800">
             <thead>
               <tr class="bg-brand-900 border-b border-slate-700/80">
-                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-400 text-center w-12">Rank</th>
-                <th scope="col" onclick="resortTable('companyName')" class="${thCls('companyName', 'w-48')}">Company${arrow('companyName')}</th>
-                <th scope="col" onclick="resortTable('symbol')" class="${thCls('symbol', 'w-20')}">Ticker${arrow('symbol')}</th>
+                <th scope="col" class="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-slate-400 text-center w-12 sticky-col-rank">Rank</th>
+                <th scope="col" onclick="resortTable('companyName')" class="${thCls('companyName', 'w-48')} sticky-col-company">Company${arrow('companyName')}</th>
+                <th scope="col" onclick="resortTable('symbol')" class="${thCls('symbol', 'w-20')} sticky-col-ticker">Ticker${arrow('symbol')}</th>
                 ${colHeaders}
                 <th scope="col" onclick="resortTable('criteria_met')" class="${thCls('criteria_met', 'text-center')}">Criteria Met${arrow('criteria_met')}</th>
                 <th scope="col" onclick="resortTable('structural_risk')" class="${thCls('structural_risk', 'text-center')}">Structural Risk${arrow('structural_risk')}</th>
