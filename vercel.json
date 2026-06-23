@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run build:css",
+  "outputDirectory": ".",
   "functions": {
     "api/ratios.js":  { "memory": 128, "maxDuration": 10 },
     "api/sector.js":  { "memory": 256, "maxDuration": 30 },
